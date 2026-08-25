@@ -1,0 +1,38 @@
+# ── 公司真实数据（红线：永不入库）──
+core/tests/fixtures/private/
+*.secret.*
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── Node / 前端 ──
+node_modules/
+web/dist/
+web/coverage/
+*.local
+.vite/
+
+# ── Pyodide 大体积运行时（构建时下载，不入库）──
+web/public/pyodide/*
+!web/public/pyodide/.gitkeep
+
+# ── 系统 / 编辑器 ──
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# ── Playwright ──
+test-results/
+playwright-report/
