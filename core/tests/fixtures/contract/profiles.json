@@ -1,0 +1,55 @@
+{
+  "bom_input": {
+    "schema_version": 1,
+    "kind": "bom_input",
+    "id": "contract-fixture-bom-input",
+    "name": "契约 fixture · 嘉立创EDA",
+    "builtin": false,
+    "header_fingerprint": null,
+    "header_row_index": 0,
+    "column_map": {
+      "Name": "value",
+      "Designator": "designator",
+      "Quantity": "qty",
+      "Footprint": "footprint",
+      "Device": "mpn",
+      "Manufacturer": "manufacturer",
+      "Comment": "description",
+      "Secondary Category": "category",
+      "Tolerance": "tolerance"
+    },
+    "options": { "dnp_markers": ["DNP"], "skip_disabled": true }
+  },
+  "material_input": {
+    "schema_version": 1,
+    "kind": "material_input",
+    "id": "contract-fixture-material-input",
+    "name": "契约 fixture · 金蝶物料表",
+    "builtin": false,
+    "header_fingerprint": null,
+    "header_row_index": 0,
+    "column_map": { "编码": "code", "名称": "name", "规格型号": "spec", "禁用状态": "status" },
+    "options": { "skip_disabled": true }
+  },
+  "output_template": {
+    "schema_version": 1,
+    "kind": "output_template",
+    "id": "contract-fixture-output-template",
+    "name": "契约 fixture · 默认输出模板",
+    "builtin": false,
+    "base_xlsx_b64": null,
+    "sheet_index": 0,
+    "data_start_row": 5,
+    "columns": {
+      "A": "seq", "B": "code", "C": "material_name", "D": "material_spec",
+      "E": "designator", "F": "qty", "G": "footprint", "H": "manufacturer",
+      "I": null, "J": "mpn", "K": "description", "L": "match_status"
+    },
+    "meta_cells": {},
+    "fixed_rows": [],
+    "style": {
+      "borders": true, "status_colors": true, "missing_highlight": true,
+      "dnp_highlight": true, "row_height_auto": true
+    }
+  }
+}

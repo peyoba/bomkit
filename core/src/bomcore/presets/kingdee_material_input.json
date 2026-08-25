@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "kind": "material_input",
+  "id": "builtin-kingdee-material-input",
+  "name": "金蝶完整物料表",
+  "builtin": true,
+  "header_fingerprint": null,
+  "header_row_index": 0,
+  "column_map": {
+    "编码": "code",
+    "名称": "name",
+    "规格型号": "spec",
+    "禁用状态": "status"
+  },
+  "options": {
+    "skip_disabled": true
+  }
+}

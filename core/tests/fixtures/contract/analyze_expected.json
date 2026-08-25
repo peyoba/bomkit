@@ -1,0 +1,267 @@
+{
+  "items": [
+    {
+      "row_id": 0,
+      "fields": {
+        "designator": "R1, R2",
+        "qty": 2.0,
+        "value": "10kΩ",
+        "footprint": "R0603",
+        "mpn": "RS-03K1002FT",
+        "manufacturer": "FH",
+        "description": "10kΩ",
+        "category": "贴片电阻",
+        "tolerance": "±1%",
+        "dnp": false
+      },
+      "match": {
+        "level": "substring",
+        "status_text": "料号匹配",
+        "confidence": "low",
+        "candidates": [
+          {
+            "code": "01.0001",
+            "name": "贴片电阻",
+            "spec": "10kΩ±1%/R0603(RS-03K1002FT)/FH(风华)"
+          }
+        ],
+        "selected": 0,
+        "manual_code": null
+      }
+    },
+    {
+      "row_id": 1,
+      "fields": {
+        "designator": "R6",
+        "qty": 1.0,
+        "value": "1kΩ",
+        "footprint": "R0805",
+        "mpn": "DUPX100",
+        "manufacturer": "",
+        "description": "",
+        "category": "贴片电阻",
+        "tolerance": "±5%",
+        "dnp": false
+      },
+      "match": {
+        "level": "multi",
+        "status_text": "多个匹配(2)",
+        "confidence": "medium",
+        "candidates": [
+          {
+            "code": "01.0006",
+            "name": "贴片电阻",
+            "spec": "1K±5%/R0805(DUPX100)"
+          },
+          {
+            "code": "30.0006",
+            "name": "贴片电阻",
+            "spec": "1K±5%/R0805(DUPX100-ALT)"
+          }
+        ],
+        "selected": 0,
+        "manual_code": null
+      }
+    },
+    {
+      "row_id": 2,
+      "fields": {
+        "designator": "R5",
+        "qty": 1.0,
+        "value": "220Ω",
+        "footprint": "R0603",
+        "mpn": "TD03G2200BT",
+        "manufacturer": "",
+        "description": "",
+        "category": "贴片电阻",
+        "tolerance": "±1%",
+        "dnp": false
+      },
+      "match": {
+        "level": "param",
+        "status_text": "参数匹配",
+        "confidence": "medium",
+        "candidates": [
+          {
+            "code": "01.0005",
+            "name": "贴片电阻",
+            "spec": "220R±1%/R0603"
+          }
+        ],
+        "selected": 0,
+        "manual_code": null
+      }
+    },
+    {
+      "row_id": 3,
+      "fields": {
+        "designator": "R4",
+        "qty": 2.0,
+        "value": "4.7K",
+        "footprint": "R0402",
+        "mpn": "0402WGF4701T5E",
+        "manufacturer": "UNI-ROYAL",
+        "description": "",
+        "category": "贴片电阻",
+        "tolerance": "±1%",
+        "dnp": false
+      },
+      "match": {
+        "level": "model",
+        "status_text": "型号匹配",
+        "confidence": "high",
+        "candidates": [
+          {
+            "code": "01.0004",
+            "name": "贴片电阻",
+            "spec": "0402WGF4701T5E/UNI-ROYAL/RC0402"
+          }
+        ],
+        "selected": 0,
+        "manual_code": null
+      }
+    },
+    {
+      "row_id": 4,
+      "fields": {
+        "designator": "C1",
+        "qty": 1.0,
+        "value": "100nF",
+        "footprint": "C0603",
+        "mpn": "0603B104K500NT",
+        "manufacturer": "FH",
+        "description": "100nF",
+        "category": "贴片电容(MLCC)",
+        "tolerance": "±10%",
+        "dnp": false
+      },
+      "match": {
+        "level": "substring",
+        "status_text": "料号匹配",
+        "confidence": "low",
+        "candidates": [
+          {
+            "code": "01.0002",
+            "name": "贴片电容",
+            "spec": "100nF±10%/50V/C0603(0603B104K500NT)/FH(风华)"
+          }
+        ],
+        "selected": 0,
+        "manual_code": null
+      }
+    },
+    {
+      "row_id": 5,
+      "fields": {
+        "designator": "U1",
+        "qty": 1.0,
+        "value": "STM32F103RCT6",
+        "footprint": "LQFP64",
+        "mpn": "STM32F103RCT6",
+        "manufacturer": "ST",
+        "description": "",
+        "category": "芯片",
+        "tolerance": "",
+        "dnp": false
+      },
+      "match": {
+        "level": "exact",
+        "status_text": "精确匹配",
+        "confidence": "high",
+        "candidates": [
+          {
+            "code": "01.0003",
+            "name": "单片机",
+            "spec": "STM32F103RCT6"
+          }
+        ],
+        "selected": 0,
+        "manual_code": null
+      }
+    },
+    {
+      "row_id": 6,
+      "fields": {
+        "designator": "U2",
+        "qty": 1.0,
+        "value": "未知件",
+        "footprint": "SOT23",
+        "mpn": "XYZ-UNKNOWN-PART",
+        "manufacturer": "",
+        "description": "",
+        "category": "IC",
+        "tolerance": "",
+        "dnp": false
+      },
+      "match": {
+        "level": "none",
+        "status_text": "未匹配",
+        "confidence": "low",
+        "candidates": [],
+        "selected": 0,
+        "manual_code": null
+      }
+    },
+    {
+      "row_id": 7,
+      "fields": {
+        "designator": "TP1",
+        "qty": 1.0,
+        "value": "TP1_hole",
+        "footprint": "",
+        "mpn": "Test-Point",
+        "manufacturer": "",
+        "description": "",
+        "category": "",
+        "tolerance": "",
+        "dnp": false
+      },
+      "match": {
+        "level": "non_component",
+        "status_text": "非物料",
+        "confidence": "high",
+        "candidates": [],
+        "selected": 0,
+        "manual_code": null
+      }
+    },
+    {
+      "row_id": 8,
+      "fields": {
+        "designator": "R3",
+        "qty": 1.0,
+        "value": "10kΩ-DNP",
+        "footprint": "R0603",
+        "mpn": "RS-03K1002FT",
+        "manufacturer": "FH",
+        "description": "10kΩ-DNP",
+        "category": "贴片电阻",
+        "tolerance": "±1%",
+        "dnp": true
+      },
+      "match": {
+        "level": "substring",
+        "status_text": "料号匹配",
+        "confidence": "low",
+        "candidates": [
+          {
+            "code": "01.0001",
+            "name": "贴片电阻",
+            "spec": "10kΩ±1%/R0603(RS-03K1002FT)/FH(风华)"
+          }
+        ],
+        "selected": 0,
+        "manual_code": null
+      }
+    }
+  ],
+  "stats": {
+    "total": 9,
+    "matched": 2,
+    "low_confidence": 3,
+    "param": 1,
+    "multi": 1,
+    "unmatched": 1,
+    "non_component": 1
+  }
+}

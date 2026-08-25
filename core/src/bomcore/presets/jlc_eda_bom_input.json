@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "kind": "bom_input",
+  "id": "builtin-jlc-eda-bom-input",
+  "name": "嘉立创EDA 专业版",
+  "builtin": true,
+  "header_fingerprint": null,
+  "header_row_index": 0,
+  "column_map": {
+    "Name": "value",
+    "Designator": "designator",
+    "Quantity": "qty",
+    "Footprint": "footprint",
+    "Device": "mpn",
+    "Manufacturer": "manufacturer",
+    "Comment": "description",
+    "Secondary Category": "category",
+    "Tolerance": "tolerance"
+  },
+  "options": {
+    "dnp_markers": ["DNP"],
+    "skip_disabled": true
+  }
+}

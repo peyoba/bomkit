@@ -1,0 +1,131 @@
+{
+  "cases": [
+    {
+      "name": "standard_header_first_row",
+      "kind": "bom_input",
+      "rows": [
+        [
+          "Designator",
+          "Quantity",
+          "Name",
+          "Footprint"
+        ],
+        [
+          "R1",
+          "2",
+          "10kΩ",
+          "R0603"
+        ]
+      ],
+      "expected_header_row_index": 0,
+      "expected_low_confidence": false
+    },
+    {
+      "name": "header_offset_third_row",
+      "kind": "bom_input",
+      "rows": [
+        [
+          "某标题占位行"
+        ],
+        [
+          ""
+        ],
+        [
+          "Designator",
+          "Quantity",
+          "Name",
+          "Footprint"
+        ],
+        [
+          "R1",
+          "2",
+          "10kΩ",
+          "R0603"
+        ]
+      ],
+      "expected_header_row_index": 2,
+      "expected_low_confidence": false
+    },
+    {
+      "name": "mixed_chinese_english_header",
+      "kind": "bom_input",
+      "rows": [
+        [
+          "位号",
+          "数量",
+          "名称",
+          "封装",
+          "厂商"
+        ],
+        [
+          "R1",
+          "2",
+          "10kΩ",
+          "R0603",
+          "FH"
+        ]
+      ],
+      "expected_header_row_index": 0,
+      "expected_low_confidence": false
+    },
+    {
+      "name": "unrecognizable_header",
+      "kind": "bom_input",
+      "rows": [
+        [
+          "",
+          "",
+          ""
+        ],
+        [
+          "foo",
+          "bar",
+          "baz"
+        ]
+      ],
+      "expected_header_row_index": 0,
+      "expected_low_confidence": true
+    },
+    {
+      "name": "kingdee_material_table",
+      "kind": "material_input",
+      "rows": [
+        [
+          "编码",
+          "名称",
+          "规格型号",
+          "禁用状态"
+        ],
+        [
+          "01.0001",
+          "贴片电阻",
+          "10K/0603",
+          "否"
+        ]
+      ],
+      "expected_header_row_index": 0,
+      "expected_low_confidence": false
+    },
+    {
+      "name": "old_simple_material_table",
+      "kind": "material_input",
+      "rows": [
+        [
+          "某标题占位行"
+        ],
+        [
+          "规格",
+          "物料编码",
+          "金蝶系统型号"
+        ],
+        [
+          "RS-03K1002FT",
+          "01.0001",
+          "10K电阻"
+        ]
+      ],
+      "expected_header_row_index": 1,
+      "expected_low_confidence": false
+    }
+  ]
+}

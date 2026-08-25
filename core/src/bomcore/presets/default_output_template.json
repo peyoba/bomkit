@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "output_template",
+  "id": "builtin-default-pcba-template",
+  "name": "默认 PCBA 模板（内置）",
+  "builtin": true,
+  "base_xlsx_b64": null,
+  "sheet_index": 0,
+  "data_start_row": 5,
+  "columns": {
+    "A": "seq",
+    "B": "code",
+    "C": "material_name",
+    "D": "material_spec",
+    "E": "designator",
+    "F": "qty",
+    "G": "footprint",
+    "H": "manufacturer",
+    "I": null,
+    "J": "mpn",
+    "K": "description",
+    "L": "match_status"
+  },
+  "meta_cells": {},
+  "fixed_rows": [],
+  "style": {
+    "borders": true,
+    "status_colors": true,
+    "missing_highlight": true,
+    "dnp_highlight": true,
+    "row_height_auto": true
+  }
+}

@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bomkit-cli"
+version = "0.1.0"
+description = "bomkit 命令行入口（薄壳，复用 bomcore.api，参数兼容旧 jlc_bom_converter CLI）"
+requires-python = ">=3.10"
+dependencies = [
+    "bomcore",
+]
+
+[project.scripts]
+bomkit = "bomkit_cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

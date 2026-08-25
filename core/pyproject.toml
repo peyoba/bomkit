@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bomcore"
+version = "0.1.0"
+description = "BOM 转换与物料匹配核心引擎（纯逻辑，Pyodide/CLI 共用）"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+dependencies = [
+    "openpyxl>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "ruff",
+    "build",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+bomcore = ["aliases/*.json", "presets/*.json"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
