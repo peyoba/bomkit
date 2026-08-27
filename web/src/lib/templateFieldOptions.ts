@@ -1,0 +1,16 @@
+export const OUTPUT_COLUMN_FIELD_OPTIONS: { value: string; label: string }[] = [
+  { value: "seq", label: "序号 (seq)" },
+  { value: "code", label: "物料编码 (code)" },
+  { value: "material_name", label: "物料名称 (material_name)" },
+  { value: "material_spec", label: "规格型号 (material_spec)" },
+  { value: "designator", label: "位号 (designator)" },
+  { value: "qty", label: "数量 (qty)" },
+  { value: "value", label: "值/名称 (value)" },
+  { value: "footprint", label: "封装 (footprint)" },
+  { value: "mpn", label: "料号/型号 (mpn)" },
+  { value: "manufacturer", label: "厂商 (manufacturer)" },
+  { value: "description", label: "备注 (description)" },
+  { value: "category", label: "类别 (category)" },
+  { value: "tolerance", label: "精度 (tolerance)" },
+  { value: "match_status", label: "匹配状态 (match_status)" },
+];
