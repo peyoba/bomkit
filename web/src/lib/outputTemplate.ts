@@ -1,8 +1,7 @@
-﻿/**
+/**
  * 内置默认 PCBA 输出模板 Profile（与 core/src/bomcore/presets/default_output_template.json
  * 字段完全一致，见 docs/02-contracts.md #3.2）。前端在向导「输出模板」步骤默认使用它；
- * 后续若支持「上传自定义模板」，在此模块旁增加解析上传模板生成 OutputTemplateProfile
- * 的函数，不改动这个内置默认值。
+ * 自定义模板由 TemplateAnnotator 生成 OutputTemplateProfile，不改动这个内置默认值。
  */
 import type { OutputTemplateProfile } from "../types/contracts";
 
