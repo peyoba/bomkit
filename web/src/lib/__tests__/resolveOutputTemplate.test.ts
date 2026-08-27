@@ -15,13 +15,16 @@ const custom = buildOutputTemplateProfile({
 });
 
 describe("resolveOutputTemplate", () => {
-  it("keeps annotated profile; default only if none chosen", () => {
-    const keep = resolveOutputTemplate("builtin", custom);
-    expect(keep.ok).toBe(true);
-    if (keep.ok) expect(keep.profile.id).toBe(custom.id);
-    const fallback = resolveOutputTemplate("builtin", null);
-    expect(fallback.ok).toBe(true);
-    if (fallback.ok) expect(fallback.profile.id).toBe(DEFAULT_OUTPUT_TEMPLATE.id);
+  it("builtin uses default; custom requires a ready annotated profile", () => {
+    const builtin = resolveOutputTemplate("builtin", custom);
+    expect(builtin.ok).toBe(true);
+    if (builtin.ok) expect(builtin.profile.id).toBe(DEFAULT_OUTPUT_TEMPLATE.id);
+
+    const customOk = resolveOutputTemplate("custom", custom);
+    expect(customOk.ok).toBe(true);
+    if (customOk.ok) expect(customOk.profile.id).toBe(custom.id);
+
     expect(resolveOutputTemplate("custom", DEFAULT_OUTPUT_TEMPLATE).ok).toBe(false);
+    expect(resolveOutputTemplate("custom", null).ok).toBe(false);
   });
 });
