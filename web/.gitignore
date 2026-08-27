@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Pyodide 自托管运行时/wheel（构建产物，见 scripts/prepare-pyodide.mjs，
+# 见 docs/01-architecture.md：public/pyodide/ 标注为构建产物 gitignored）
+public/pyodide/*
+!public/pyodide/.gitkeep

@@ -94,3 +94,13 @@ def test_full_conversion_pipeline():
     assert "01.0001" in codes
     assert "01.0002" in codes
     assert any(n for n in names)  # 至少一行物料名称非空
+
+    # 回归断言（2026-08 用户决定）：料号匹配（substring）行不再整行铺琥珀底色，
+    # 保持默认空白；非物料行的灰色底色维持不变。
+    for r in range(5, ws.max_row + 1):
+        status = ws.cell(row=r, column=12).value
+        fill_type = ws.cell(row=r, column=2).fill.fill_type
+        if status == "料号匹配":
+            assert not fill_type, f"row {r} 料号匹配行不应有行底色"
+        elif status == "非物料":
+            assert fill_type, f"row {r} 非物料行应保留底色"

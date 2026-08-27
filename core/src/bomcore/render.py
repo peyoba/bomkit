@@ -26,9 +26,11 @@ from .models import cell_text
 from .schema import ProfileError, validate_output_template
 
 # ── 颜色表（契约第 7 节，预览 UI 与导出 Excel 必须一致） ──
+# 注意：substring（料号匹配，低置信度）不再整行铺琥珀底色——2026-08 用户
+# 决定：这类行保持默认空白即可（契约文档第 7 节的琥珀色描述已过时，待
+# 任务分发者修订文档）。多候选等其余状态颜色维持不变。
 
 FILL_MATCH = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # 绿：exact/model
-FILL_SUBSTRING = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # 琥珀
 FILL_PARAM = PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")  # 蓝
 FILL_NONE = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # 红
 FILL_NON_COMPONENT = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")  # 灰
@@ -42,7 +44,6 @@ FILL_MULTI_PARAM_B = PatternFill(start_color="E9EFF7", end_color="E9EFF7", fill_
 _LEVEL_FILL = {
     "exact": FILL_MATCH,
     "model": FILL_MATCH,
-    "substring": FILL_SUBSTRING,
     "param": FILL_PARAM,
     "none": FILL_NONE,
     "non_component": FILL_NON_COMPONENT,
@@ -126,10 +127,18 @@ def _resolve_row(item: dict, priority_prefix: str = "01.") -> dict:
     else:
         chosen = {"code": "", "name": "", "spec": ""}
 
+    # 旧核心行为对齐（05-migration-map.md 边界 case 补充）：物料名称列在
+    # 未匹配到真实物料名称时（none/non_component/skipped，candidates 为空），
+    # 回退显示 BOM 自身的 Secondary Category（旧核心 658 行 display_name 逻辑），
+    # 而不是留空——否则测试点/安装孔/未匹配元件这一列会比旧工具少一份可读信息。
+    chosen_name = chosen.get("name", "")
+    if not chosen_name:
+        chosen_name = cell_text(item.get("fields", {}).get("category", ""))
+
     return {
         "expand": False,
         "rows": [{
-            "code": chosen.get("code", ""), "name": chosen.get("name", ""),
+            "code": chosen.get("code", ""), "name": chosen_name,
             "spec": chosen.get("spec", ""), "status_text": match.get("status_text", ""),
             "level": level,
         }],

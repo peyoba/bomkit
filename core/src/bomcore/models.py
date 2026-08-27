@@ -35,6 +35,9 @@ class BomItem:
     description: str = ""
     category: str = ""
     tolerance: str = ""
+    # 源 BOM 自带的企业物料编码（schema.BOM_FIELDS.source_code 映射列）。
+    # 仅用于 analyze 的"编码直配"预检，不进入契约 6.2 的 fields 输出。
+    source_code: str = ""
     dnp: bool = False
     extras: dict = field(default_factory=dict)
 

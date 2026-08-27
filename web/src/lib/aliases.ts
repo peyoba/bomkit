@@ -10,13 +10,27 @@ export const ALIASES: Record<string, string[]> = {
   qty: ["quantity", "qty", "数量", "用量"],
   value: ["name", "value", "名称", "值", "元件值"],
   footprint: ["footprint", "封装", "package", "pcb footprint"],
-  mpn: ["device", "mpn", "manufacturer part number", "型号", "器件型号", "料号"],
+  mpn: ["device", "mpn", "manufacturer part number", "型号", "器件型号", "料号", "jlc规格"],
   manufacturer: ["manufacturer", "厂商", "厂家", "制造商"],
   description: ["comment", "description", "备注", "说明"],
   category: ["secondary category", "category", "类别", "分类", "元件类别"],
   tolerance: ["tolerance", "精度", "误差"],
-  code: ["编码", "code", "物料编码"],
+  code: ["编码", "code"],
+  source_code: ["物料编码", "物料编号", "物料代码"],
   spec: ["规格型号", "spec", "规格", "型号"],
   name: ["名称", "name", "物料名称"],
   status: ["禁用状态", "status", "状态"],
+};
+
+/**
+ * kind -> 允许映射的字段集合。必须与 core/src/bomcore/schema.py 的
+ * BOM_FIELDS / MATERIAL_FIELDS 保持同步，并与 detect.ts 的 kind 过滤、
+ * Wizard 页的 *_FIELD_OPTIONS 三方一致。
+ */
+export const KIND_ALLOWED_FIELDS: Record<"bom_input" | "material_input", ReadonlySet<string>> = {
+  bom_input: new Set([
+    "designator", "qty", "value", "footprint", "mpn",
+    "manufacturer", "description", "category", "tolerance", "source_code",
+  ]),
+  material_input: new Set(["code", "name", "spec", "status", "category"]),
 };

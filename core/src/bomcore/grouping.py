@@ -82,19 +82,39 @@ def component_order(category: str, order_table: dict | None = None) -> int:
     return 11
 
 
+def _nan_last_key(text: str) -> tuple:
+    """Emulate legacy pandas.groupby(dropna=False) implicit ordering:
+    empty values (cell_text normalizes None -> empty string) must sort
+    LAST, matching pandas NaN with na_position='last'. Otherwise an
+    empty string sorts FIRST as the smallest string, reversing the
+    relative order of all uncategorized rows (test points, mounting
+    holes, connectors whose Name/Footprint are blank) compared to the
+    legacy tool. See docs/05-migration-map.md edge-case addendum.
+    """
+    return (1, "") if text == "" else (0, text)
+
+
 def group_and_sort(items: list[BomItem], order_table: dict | None = None) -> list[BomItem]:
     """分组键 (value, footprint, dnp) 三元组；designator 自然排序合并；
     qty 求和；其余字段取首个非空。排序链：非 DNP 优先 -> 有类别优先 ->
     COMPONENT_ORDER -> value 字母序（旧核心 642-663 行）。
     """
     groups: dict[tuple, list[BomItem]] = {}
-    order_keys: list[tuple] = []
     for item in items:
         key = (item.value, item.footprint, item.dnp)
-        if key not in groups:
-            groups[key] = []
-            order_keys.append(key)
-        groups[key].append(item)
+        groups.setdefault(key, []).append(item)
+
+    # Legacy core used pandas.groupby(dropna=False), which sorts groups by
+    # key BEFORE the later sort_values() call. When that sort ties (same
+    # value but different footprint, or several uncategorized rows), the
+    # stable sort falls back to this pre-sorted grouping order. Building
+    # groups from raw file order and skipping this step made tie-broken
+    # output order diverge from the legacy tool on real BOM data, so we
+    # replicate the implicit pre-sort here.
+    order_keys: list[tuple] = sorted(
+        groups.keys(),
+        key=lambda k: (_nan_last_key(k[0]), _nan_last_key(k[1]), k[2]),
+    )
 
     merged: list[BomItem] = []
     for key in order_keys:
@@ -110,6 +130,9 @@ def group_and_sort(items: list[BomItem], order_table: dict | None = None) -> lis
             description=join_unique([r.description for r in rows]),
             category=first_not_empty([r.category for r in rows]),
             tolerance=first_not_empty([r.tolerance for r in rows]),
+            # 与 mpn 同规则：组内首个非空。缺失会导致 analyze 的编码直配
+            # 预检在合并后的行上静默失效。
+            source_code=first_not_empty([r.source_code for r in rows]),
             dnp=dnp,
             extras={},
         )
@@ -121,7 +144,7 @@ def group_and_sort(items: list[BomItem], order_table: dict | None = None) -> lis
             item.dnp,
             is_empty_category,
             component_order(item.category, order_table),
-            item.value,
+            _nan_last_key(item.value),
         )
 
     merged.sort(key=sort_key)

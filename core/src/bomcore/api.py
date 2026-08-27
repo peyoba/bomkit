@@ -43,7 +43,12 @@ def _rows_to_bom_items(rows: list[list[str]], profile: dict) -> list[BomItem]:
             source_name = header[col_idx] if col_idx < len(header) else f"col_{col_idx}"
             field_id = col_to_field.get(col_idx)
             if field_id:
-                values[field_id] = text
+                # 同一字段被映射到多列时首列非空值生效，后面的列不再覆盖。
+                # 真实故障：表头新旧编码列并存且都被指到 code，末列覆盖后
+                # 正式编码被旧编码静默替换。检测层已去重，这里兜底用户手动
+                # 在界面上把两列拖到同一字段的情况。
+                if field_id not in values or not values[field_id]:
+                    values[field_id] = text
             elif text:
                 extras[source_name] = text
 
@@ -67,6 +72,9 @@ def _rows_to_bom_items(rows: list[list[str]], profile: dict) -> list[BomItem]:
             description=description,
             category=values.get("category", ""),
             tolerance=values.get("tolerance", ""),
+            # 兼容旧版 Profile：detect 尚未按 kind 过滤时，BOM 的"物料编码"
+            # 列会被存成 column_map["物料编码"]="code"；读回时转成 source_code。
+            source_code=(values.get("source_code") or values.get("code") or "").strip(),
             dnp=is_dnp(description, dnp_markers),
             extras=extras,
         )
@@ -119,7 +127,9 @@ def _rows_to_material_items(rows: list[list[str]], profile: dict) -> list[Materi
             source_name = header[col_idx] if col_idx < len(header) else f"col_{col_idx}"
             field_id = col_to_field.get(col_idx)
             if field_id:
-                values[field_id] = text
+                # 同字段多列映射时首列非空生效（与 _rows_to_bom_items 一致）。
+                if field_id not in values or not values[field_id]:
+                    values[field_id] = text
             elif text:
                 extras[source_name] = text
 
@@ -161,6 +171,8 @@ def analyze(
 
     cfg = match_config or DEFAULT_MATCH_CONFIG
     rc_index = build_material_rc_index(material_items) if material_items else []
+    # 编码直配索引：源 BOM 已带企业编码的行跳过级联匹配直接查库。
+    code_to_material = {m.code: m for m in material_items if m.code}
 
     items = []
     stats = {
@@ -187,17 +199,28 @@ def analyze(
                 "level": "skipped", "status_text": "", "confidence": None,
                 "code": "", "name": "", "spec": "", "candidates": [],
             }
-        elif not bom_item.mpn:
-            match_result = {
-                "level": "none", "status_text": "未匹配", "confidence": "low",
-                "code": "", "name": "", "spec": "", "candidates": [],
-            }
         else:
-            match_result = match_device(
-                bom_item.mpn, material_items, rc_index,
-                name=bom_item.value, footprint=bom_item.footprint,
-                tolerance=bom_item.tolerance, match_config=cfg,
-            )
+            source_code = (bom_item.source_code or "").strip()
+            direct = code_to_material.get(source_code) if source_code else None
+            if direct is not None:
+                # 源编码与物料库 code 精确相等：最可信的一级，无需清洗与子串试探。
+                match_result = {
+                    "level": "exact", "status_text": "编码直配", "confidence": "high",
+                    "code": direct.code, "name": direct.name, "spec": direct.spec,
+                    "candidates": [{"code": direct.code, "name": direct.name, "spec": direct.spec}],
+                }
+            else:
+                # 立创EDA 等导出格式没有独立型号列，完整料号直接放在值(Name)列。此时
+                # mpn 映射后为空，若以此为由跳过匹配，真实用户数据会整表未匹配（实测
+                # 74 行无一命中，尽管物料库存在可直接子串命中的条目）。回退用 value
+                # 作匹配主键；两者皆空时 match_device 的 try_upper 空串跳过逻辑自然
+                # 退化为"未匹配"，行为与旧实现一致。
+                device = bom_item.mpn.strip() or bom_item.value.strip()
+                match_result = match_device(
+                    device, material_items, rc_index,
+                    name=bom_item.value, footprint=bom_item.footprint,
+                    tolerance=bom_item.tolerance, match_config=cfg,
+                )
 
         level = match_result["level"]
         candidates = match_result["candidates"]
