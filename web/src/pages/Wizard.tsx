@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 转换向导：AntD Steps 四步。默认使用真实 Pyodide Worker（首次进入向导即开始
  * 后台冷启动加载，进度条见 workerStore），mock Worker 仅供 Vitest/开发调试
  * 通过 ?worker=mock 查询参数切换。BOM_FIELD_OPTIONS/MATERIAL_FIELD_OPTIONS
@@ -6,13 +6,15 @@
  * 同步另一侧。
  */
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Form, Input, Progress, Steps, Upload, message } from "antd";
+import { Alert, Button, Form, Input, Progress, Radio, Steps, Upload, message } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { v4 as uuidv4 } from "uuid";
 import { readXlsxRows } from "../lib/xlsx";
 import { detect } from "../lib/detect";
 import { DEFAULT_OUTPUT_TEMPLATE } from "../lib/outputTemplate";
+import { resolveOutputTemplate } from "../lib/resolveOutputTemplate";
 import { MappingTable } from "../components/MappingTable";
+import { TemplateAnnotator } from "../components/TemplateAnnotator";
 import { useWizardStore } from "../stores/wizardStore";
 import { useWorkerStore } from "../stores/workerStore";
 import { getWorkerClient } from "../workers/singleton";
@@ -39,10 +41,6 @@ const MATERIAL_FIELD_OPTIONS = [
   { value: "category", label: "类别 (category)" },
 ];
 
-// 必填字段清单，与 core/src/bomcore/schema.py 的 BOM_REQUIRED_FIELDS /
-// MATERIAL_REQUIRED_FIELDS 严格保持一致——两侧任一改动都要同步另一侧，否则
-// 前端会"放行"一个后端必然拒绝的映射，用户直到最后一步点「开始转换」才会
-// 看到报错（真实故障复现过，见开发报告）。
 const BOM_REQUIRED_FIELDS = ["designator", "qty", "value", "footprint"];
 const MATERIAL_REQUIRED_FIELDS = ["code", "spec"];
 
@@ -50,10 +48,6 @@ const FIELD_LABELS: Record<string, string> = Object.fromEntries(
   [...BOM_FIELD_OPTIONS, ...MATERIAL_FIELD_OPTIONS].map((o) => [o.value, o.label])
 );
 
-/** 校验 column_map 是否覆盖了全部必填字段；返回缺失字段的中文标签列表
- * （空数组表示校验通过）。在「确认映射」按钮点击时调用，把后端 analyze()
- * 才会抛出的 MISSING_REQUIRED_FIELD 错误提前到映射步骤拦截，避免用户走完
- * 整个向导后才在最后一步发现问题。 */
 function findMissingRequiredFields(columns: DetectColumn[], required: string[]): string[] {
   const mapped = new Set(columns.map((c) => c.guess_field).filter((f): f is string => Boolean(f)));
   return required.filter((f) => !mapped.has(f)).map((f) => FIELD_LABELS[f] ?? f);
@@ -99,11 +93,10 @@ export function Wizard() {
   const [materialHeaderRowIndex, setMaterialHeaderRowIndex] = useState(0);
   const [materialRawRows, setMaterialRawRows] = useState<string[][] | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [templateMode, setTemplateMode] = useState<"builtin" | "custom">("builtin");
 
   const stepIndex = { bom: 0, material: 1, template: 2, convert: 3 }[step];
 
-  // worker 是全局单例（见 workers/singleton.ts）：Wizard 用它做 detect/analyze，
-  // Preview 页面用同一个实例做 render()，避免重复 spawn Worker / 重复冷启动。
   const worker = useMemo(() => getWorkerClient(), []);
 
   useEffect(() => {
@@ -119,11 +112,9 @@ export function Wizard() {
       setBomHeaderRowIndex(result.header_row_index);
       setBomColumns(result.columns);
     } catch (err) {
-      // 不吞异常：xlsx 解析失败（如损坏文件/极端 ZIP 编码）必须给用户可见提示，
-      // 否则会表现为"上传后无反应"（真实故障曾在此复现，见开发报告）。
       message.error(`读取 BOM 文件失败：${err instanceof Error ? err.message : String(err)}`);
     }
-    return false; // 阻止 AntD Upload 自动上传行为——本来就不该有任何网络请求。
+    return false;
   }
 
   function confirmBomMapping() {
@@ -173,9 +164,14 @@ export function Wizard() {
   }
 
   async function runAnalyze() {
-    const { bomRows, bomProfile, materialRows, materialProfile } = useWizardStore.getState();
+    const { bomRows, bomProfile, materialRows, materialProfile, outputTemplate } = useWizardStore.getState();
     if (!bomRows || !bomProfile) return;
-    setOutputTemplate(DEFAULT_OUTPUT_TEMPLATE);
+    const resolved = resolveOutputTemplate(templateMode, outputTemplate);
+    if (!resolved.ok) {
+      message.error(resolved.message);
+      return;
+    }
+    setOutputTemplate(resolved.profile);
     setAnalyzing(true);
     try {
       const result = await worker.analyze({
@@ -295,7 +291,29 @@ export function Wizard() {
 
       {step === "template" && (
         <div>
-          <p>输出模板：默认内置 PCBA 模板（前期阶段仅支持默认模板）。</p>
+          <Radio.Group
+            value={templateMode}
+            onChange={(e) => {
+              const next = e.target.value as "builtin" | "custom";
+              setTemplateMode(next);
+              if (next === "builtin") setOutputTemplate(DEFAULT_OUTPUT_TEMPLATE);
+            }}
+            style={{ marginBottom: 16 }}
+          >
+            <Radio.Button value="builtin">使用内置默认模板</Radio.Button>
+            <Radio.Button value="custom">上传公司模板并标注</Radio.Button>
+          </Radio.Group>
+
+          {templateMode === "custom" && (
+            <div style={{ marginBottom: 24 }}>
+              <TemplateAnnotator onChange={setOutputTemplate} />
+            </div>
+          )}
+
+          {templateMode === "builtin" && (
+            <p>输出模板：内置默认 PCBA 模板（程序化生成表头，复刻旧工具样式）。</p>
+          )}
+
           <Form layout="vertical" style={{ maxWidth: 480, marginBottom: 16 }}>
             <Form.Item label="PCBA 名称">
               <Input
