@@ -3,7 +3,7 @@
  * localStorage key 规则：bomkit.profile.{kind}.{uuid}（契约第 3 节）。
  */
 import { fingerprint, jaccardSimilarity } from "./fingerprint";
-import type { InputProfile, OutputTemplateProfile, Profile, ProfileKind } from "../types/contracts";
+import type { DetectColumn, InputProfile, OutputTemplateProfile, Profile, ProfileKind } from "../types/contracts";
 
 const KEY_PREFIX = "bomkit.profile";
 
@@ -88,4 +88,19 @@ export async function findMatchingProfile(
 
 export function isOutputTemplateProfile(profile: Profile): profile is OutputTemplateProfile {
   return profile.kind === "output_template";
+}
+
+/**
+ * 把已保存 Profile 的 column_map 套回 detect 结果：同名列恢复用户上次确认的
+ * 映射（含 detect 自动猜不出的手动指定，如 Description -> value），新出现的
+ * 列保持 detect 的猜测不动。复用场景下映射是用户确认过的，置信度一律视为 high。
+ */
+export function applyStoredMapping(
+  columns: DetectColumn[],
+  columnMap: Record<string, string>
+): DetectColumn[] {
+  return columns.map((c) => {
+    const field = columnMap[c.source];
+    return field ? { ...c, guess_field: field, confidence: "high" } : c;
+  });
 }

@@ -13,6 +13,9 @@ import { readXlsxRows } from "../lib/xlsx";
 import { detect } from "../lib/detect";
 import { DEFAULT_OUTPUT_TEMPLATE } from "../lib/outputTemplate";
 import { resolveOutputTemplate } from "../lib/resolveOutputTemplate";
+import { applyStoredMapping, findMatchingProfile } from "../lib/profiles";
+import { saveProfileGuarded } from "../lib/profileGuard";
+import { fingerprint } from "../lib/fingerprint";
 import { MappingTable } from "../components/MappingTable";
 import { TemplateAnnotator } from "../components/TemplateAnnotator";
 import { useWizardStore } from "../stores/wizardStore";
@@ -56,23 +59,33 @@ function findMissingRequiredFields(columns: DetectColumn[], required: string[]):
 function buildProfile(
   kind: "bom_input" | "material_input",
   headerRowIndex: number,
-  columns: DetectColumn[]
+  columns: DetectColumn[],
+  opts: { reused?: InputProfile; fingerprint?: string | null; name?: string } = {}
 ): InputProfile {
   const columnMap: Record<string, string> = {};
   for (const c of columns) {
     if (c.guess_field) columnMap[c.source] = c.guess_field;
   }
+  // 复用历史配置时沿用其 id/options：同一种表头布局在 localStorage 里原地
+  // 更新，不会随每次上传堆积新条目。
+  const reused = opts.reused;
   return {
     schema_version: 1,
     kind,
-    id: uuidv4(),
-    name: kind === "bom_input" ? "未命名BOM映射" : "未命名物料库映射",
+    id: reused?.id ?? uuidv4(),
+    name: opts.name ?? reused?.name ?? (kind === "bom_input" ? "未命名BOM映射" : "未命名物料库映射"),
     builtin: false,
-    header_fingerprint: null,
+    header_fingerprint: opts.fingerprint ?? reused?.header_fingerprint ?? null,
     header_row_index: headerRowIndex,
     column_map: columnMap,
-    options: kind === "bom_input" ? { dnp_markers: ["DNP"] } : { skip_disabled: true },
+    options: reused?.options ?? (kind === "bom_input" ? { dnp_markers: ["DNP"] } : { skip_disabled: true }),
   };
+}
+
+/** 去掉扩展名的文件名，用作保存 Profile 的默认名称。 */
+function fileBaseName(fileName: string | null): string | null {
+  if (!fileName) return null;
+  return fileName.replace(/\.(xlsx|xls)$/i, "");
 }
 
 const STAGE_LABEL: Record<string, string> = {
@@ -80,6 +93,28 @@ const STAGE_LABEL: Record<string, string> = {
   installing_packages: "正在安装转换引擎…",
   ready: "转换引擎就绪",
 };
+
+/**
+ * detect + 表头指纹查历史配置。精确命中时把用户上次确认的列映射套回 detect
+ * 结果（包括自动猜测永远推不出的手动指定，如 Description -> value），命中的
+ * Profile 返回给确认环节原地复用 id；未命中则维持纯 detect 结果。
+ */
+async function detectWithProfileReuse(
+  rows: string[][],
+  kind: "bom_input" | "material_input"
+): Promise<{ result: ReturnType<typeof detect>; columns: DetectColumn[]; reused: InputProfile | null }> {
+  const result = detect(rows, kind);
+  const headers = rows[result.header_row_index] ?? [];
+  const match = await findMatchingProfile(kind, headers);
+  if (match?.exact) {
+    return {
+      result,
+      columns: applyStoredMapping(result.columns, match.profile.column_map),
+      reused: match.profile,
+    };
+  }
+  return { result, columns: result.columns, reused: null };
+}
 
 export function Wizard() {
   const { step, setStep, setBom, setMaterial, setOutputTemplate, renderMeta, setRenderMeta, setAnalyzeResult } =
@@ -89,9 +124,15 @@ export function Wizard() {
   const [bomColumns, setBomColumns] = useState<DetectColumn[] | null>(null);
   const [bomHeaderRowIndex, setBomHeaderRowIndex] = useState(0);
   const [bomRawRows, setBomRawRows] = useState<string[][] | null>(null);
+  const [bomFileName, setBomFileName] = useState<string | null>(null);
+  const [bomSheetName, setBomSheetName] = useState("Sheet1");
+  const [bomReusedProfile, setBomReusedProfile] = useState<InputProfile | null>(null);
   const [materialColumns, setMaterialColumns] = useState<DetectColumn[] | null>(null);
   const [materialHeaderRowIndex, setMaterialHeaderRowIndex] = useState(0);
   const [materialRawRows, setMaterialRawRows] = useState<string[][] | null>(null);
+  const [materialFileName, setMaterialFileName] = useState<string | null>(null);
+  const [materialSheetName, setMaterialSheetName] = useState("Sheet1");
+  const [materialReusedProfile, setMaterialReusedProfile] = useState<InputProfile | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [templateMode, setTemplateMode] = useState<"builtin" | "custom">("builtin");
 
@@ -107,50 +148,72 @@ export function Wizard() {
   async function handleBomUpload(file: File) {
     try {
       const payload = await readXlsxRows(file);
-      const result = detect(payload.rows, "bom_input");
+      const { result, columns, reused } = await detectWithProfileReuse(payload.rows, "bom_input");
       setBomRawRows(payload.rows);
+      setBomSheetName(payload.sheet_name);
+      setBomFileName(file.name);
       setBomHeaderRowIndex(result.header_row_index);
-      setBomColumns(result.columns);
+      setBomReusedProfile(reused);
+      setBomColumns(columns);
+      if (reused) {
+        message.info(`检测到与历史记录相同的表头，已自动套用映射「${reused.name}」，可直接确认或调整`);
+      }
     } catch (err) {
       message.error(`读取 BOM 文件失败：${err instanceof Error ? err.message : String(err)}`);
     }
     return false;
   }
 
-  function confirmBomMapping() {
+  async function confirmBomMapping() {
     if (!bomRawRows || !bomColumns) return;
     const missing = findMissingRequiredFields(bomColumns, BOM_REQUIRED_FIELDS);
     if (missing.length > 0) {
       message.error(`BOM 映射缺少必填字段：${missing.join("、")}，请在下方表格中为对应列选择映射字段`);
       return;
     }
-    const profile = buildProfile("bom_input", bomHeaderRowIndex, bomColumns);
-    setBom({ rows: bomRawRows, sheet_name: "Sheet1" }, profile);
+    const profile = buildProfile("bom_input", bomHeaderRowIndex, bomColumns, {
+      reused: bomReusedProfile ?? undefined,
+      fingerprint: await fingerprint(bomRawRows[bomHeaderRowIndex] ?? []),
+      name: bomReusedProfile ? undefined : `${fileBaseName(bomFileName) ?? "未命名"} 映射`,
+    });
+    saveProfileGuarded(profile); // 契约第 3/4 节：确认过的映射持久化，供指纹复用
+    setBom({ rows: bomRawRows, sheet_name: bomSheetName }, profile);
     setStep("material");
   }
 
   async function handleMaterialUpload(file: File) {
     try {
       const payload = await readXlsxRows(file);
-      const result = detect(payload.rows, "material_input");
+      const { result, columns, reused } = await detectWithProfileReuse(payload.rows, "material_input");
       setMaterialRawRows(payload.rows);
+      setMaterialSheetName(payload.sheet_name);
+      setMaterialFileName(file.name);
       setMaterialHeaderRowIndex(result.header_row_index);
-      setMaterialColumns(result.columns);
+      setMaterialReusedProfile(reused);
+      setMaterialColumns(columns);
+      if (reused) {
+        message.info(`检测到与历史记录相同的表头，已自动套用映射「${reused.name}」，可直接确认或调整`);
+      }
     } catch (err) {
       message.error(`读取物料库文件失败：${err instanceof Error ? err.message : String(err)}`);
     }
     return false;
   }
 
-  function confirmMaterialMapping() {
+  async function confirmMaterialMapping() {
     if (!materialRawRows || !materialColumns) return;
     const missing = findMissingRequiredFields(materialColumns, MATERIAL_REQUIRED_FIELDS);
     if (missing.length > 0) {
       message.error(`物料库映射缺少必填字段：${missing.join("、")}，请在下方表格中为对应列选择映射字段`);
       return;
     }
-    const profile = buildProfile("material_input", materialHeaderRowIndex, materialColumns);
-    setMaterial({ rows: materialRawRows, sheet_name: "Sheet1" }, profile);
+    const profile = buildProfile("material_input", materialHeaderRowIndex, materialColumns, {
+      reused: materialReusedProfile ?? undefined,
+      fingerprint: await fingerprint(materialRawRows[materialHeaderRowIndex] ?? []),
+      name: materialReusedProfile ? undefined : `${fileBaseName(materialFileName) ?? "未命名"} 映射`,
+    });
+    saveProfileGuarded(profile);
+    setMaterial({ rows: materialRawRows, sheet_name: materialSheetName }, profile);
     setStep("template");
   }
 
