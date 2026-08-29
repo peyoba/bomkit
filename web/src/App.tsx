@@ -4,9 +4,10 @@ import zhCN from "antd/locale/zh_CN";
 import { Home } from "./pages/Home";
 import { Wizard } from "./pages/Wizard";
 import { Preview } from "./pages/Preview";
+import { TemplateManager } from "./pages/TemplateManager";
 import { useWizardStore } from "./stores/wizardStore";
 
-type Route = "home" | "wizard";
+type Route = "home" | "wizard" | "templates";
 
 function App() {
   const [route, setRoute] = useState<Route>("home");
@@ -14,7 +15,10 @@ function App() {
 
   return (
     <ConfigProvider locale={zhCN}>
-      {route === "home" && <Home onStart={() => setRoute("wizard")} />}
+      {route === "home" && (
+        <Home onStart={() => setRoute("wizard")} onTemplates={() => setRoute("templates")} />
+      )}
+      {route === "templates" && <TemplateManager onBack={() => setRoute("home")} />}
       {route === "wizard" && (
         <>
           <Wizard />

@@ -13,15 +13,14 @@ import { readXlsxRows } from "../lib/xlsx";
 import { detect } from "../lib/detect";
 import { DEFAULT_OUTPUT_TEMPLATE } from "../lib/outputTemplate";
 import { resolveOutputTemplate } from "../lib/resolveOutputTemplate";
-import { applyStoredMapping, findMatchingProfile } from "../lib/profiles";
-import { saveProfileGuarded } from "../lib/profileGuard";
+import { applyStoredMapping, findMatchingProfile, listProfiles } from "../lib/profiles";
+import { saveProfileGuarded, isBuiltinProfile } from "../lib/profileGuard";
 import { fingerprint } from "../lib/fingerprint";
 import { MappingTable } from "../components/MappingTable";
-import { TemplateAnnotator } from "../components/TemplateAnnotator";
 import { useWizardStore } from "../stores/wizardStore";
 import { useWorkerStore } from "../stores/workerStore";
 import { getWorkerClient } from "../workers/singleton";
-import type { DetectColumn, InputProfile, RenderMeta } from "../types/contracts";
+import type { DetectColumn, InputProfile, OutputTemplateProfile, RenderMeta } from "../types/contracts";
 
 const BOM_FIELD_OPTIONS = [
   { value: "designator", label: "位号 (designator)" },
@@ -134,7 +133,10 @@ export function Wizard() {
   const [materialSheetName, setMaterialSheetName] = useState("Sheet1");
   const [materialReusedProfile, setMaterialReusedProfile] = useState<InputProfile | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [templateMode, setTemplateMode] = useState<"builtin" | "custom">("builtin");
+  // 输出模板选择：内置默认 or 用户在「标注输出模板」页保存的公司模板。
+  // 标注是独立入口（首页「标注输出模板」），向导只做选择。
+  const [templateId, setTemplateId] = useState<string>(DEFAULT_OUTPUT_TEMPLATE.id);
+  const [savedTemplates, setSavedTemplates] = useState<OutputTemplateProfile[]>([]);
 
   const stepIndex = { bom: 0, material: 1, template: 2, convert: 3 }[step];
 
@@ -144,6 +146,26 @@ export function Wizard() {
     if (mode === "pyodide" && status === "idle") setStatus("loading");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 进入「输出模板」步骤时刷新已保存模板列表（可能在模板管理页有增删）。
+  useEffect(() => {
+    if (step !== "template") return;
+    setSavedTemplates(
+      listProfiles("output_template").filter(
+        (p): p is OutputTemplateProfile => p.kind === "output_template" && !isBuiltinProfile(p)
+      )
+    );
+  }, [step]);
+
+  function handleTemplateSelect(id: string) {
+    setTemplateId(id);
+    if (id === DEFAULT_OUTPUT_TEMPLATE.id) {
+      setOutputTemplate(DEFAULT_OUTPUT_TEMPLATE);
+      return;
+    }
+    const picked = savedTemplates.find((p) => p.id === id);
+    if (picked) setOutputTemplate(picked);
+  }
 
   async function handleBomUpload(file: File) {
     try {
@@ -229,7 +251,8 @@ export function Wizard() {
   async function runAnalyze() {
     const { bomRows, bomProfile, materialRows, materialProfile, outputTemplate } = useWizardStore.getState();
     if (!bomRows || !bomProfile) return;
-    const resolved = resolveOutputTemplate(templateMode, outputTemplate);
+    const mode = templateId === DEFAULT_OUTPUT_TEMPLATE.id ? "builtin" : "custom";
+    const resolved = resolveOutputTemplate(mode, outputTemplate);
     if (!resolved.ok) {
       message.error(resolved.message);
       return;
@@ -354,28 +377,21 @@ export function Wizard() {
 
       {step === "template" && (
         <div>
+          <p>选择输出模板（新公司模板请在首页「标注输出模板」中创建）： </p>
           <Radio.Group
-            value={templateMode}
-            onChange={(e) => {
-              const next = e.target.value as "builtin" | "custom";
-              setTemplateMode(next);
-              if (next === "builtin") setOutputTemplate(DEFAULT_OUTPUT_TEMPLATE);
-            }}
-            style={{ marginBottom: 16 }}
+            value={templateId}
+            onChange={(e) => handleTemplateSelect(e.target.value)}
+            style={{ marginBottom: 24, display: "block" }}
           >
-            <Radio.Button value="builtin">使用内置默认模板</Radio.Button>
-            <Radio.Button value="custom">上传公司模板并标注</Radio.Button>
+            <Radio style={{ display: "block", lineHeight: 2 }} value={DEFAULT_OUTPUT_TEMPLATE.id}>
+              内置默认 PCBA 模板
+            </Radio>
+            {savedTemplates.map((p) => (
+              <Radio key={p.id} style={{ display: "block", lineHeight: 2 }} value={p.id}>
+                {p.name || "未命名公司模板"}
+              </Radio>
+            ))}
           </Radio.Group>
-
-          {templateMode === "custom" && (
-            <div style={{ marginBottom: 24 }}>
-              <TemplateAnnotator onChange={setOutputTemplate} />
-            </div>
-          )}
-
-          {templateMode === "builtin" && (
-            <p>输出模板：内置默认 PCBA 模板（程序化生成表头，复刻旧工具样式）。</p>
-          )}
 
           <Form layout="vertical" style={{ maxWidth: 480, marginBottom: 16 }}>
             <Form.Item label="PCBA 名称">

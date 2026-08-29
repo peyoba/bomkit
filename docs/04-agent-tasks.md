@@ -64,8 +64,8 @@ T0 必须最先完成；T1/T2/T3 可三个代理并行；T4、T5 串行收尾。
   2. detect 的 TS 实现（契约第 5 节算法），用 `detect_cases.json` 做 Vitest 用例。
   3. `lib/profiles.ts`：localStorage CRUD、指纹计算（契约 4.1/4.2，Web Crypto sha256）、Jaccard 相似推荐、JSON 导入导出。
   4. Worker 桥：`pyodide.worker.ts` 消息协议（契约 6 节）；开发模式提供 mockWorker（读 contract fixture 返回）；Pyodide 真实加载路径用占位 wheel 演练（加载进度事件→UI 进度条）。
-  5. 页面：Home（落地页：一句话价值 + 隐私说明 + 开始按钮）、Wizard（AntD Steps 四步：BOM 上传映射 → 物料库上传映射（可跳过）→ 输出模板选择/标注 → 转换）、Preview（虚拟滚动表格、状态着色按契约 7 节、CandidatePicker 单选、手改编码输入、stats 汇总条、导出按钮）。
-  6. TemplateAnnotator：上传模板 xlsx → 网格预览（SheetJS 渲染前 20 行）→ 点选数据起始行 → 每列下拉选字段 → meta_cells 点选标注 → 生成 output_template Profile（base_xlsx_b64 存入）。
+  5. 页面：Home（落地页：一句话价值 + 隐私说明 + 开始按钮 + 标注输出模板入口）、TemplateManager（独立页面：标注公司模板 + 管理已存模板，2026-08-29 用户决定标注不放在转换向导内）、Wizard（AntD Steps 四步：BOM 上传映射 → 物料库上传映射（可跳过）→ 输出模板选择（内置或已保存的公司模板）→ 转换）、Preview（虚拟滚动表格、状态着色按契约 7 节、CandidatePicker 单选、手改编码输入、stats 汇总条、导出按钮）。
+  6. TemplateAnnotator（位于 TemplateManager 页）：上传模板 xlsx → 网格预览（SheetJS 渲染前 20 行）→ 点选数据起始行 → 每列下拉选字段 → meta_cells 点选标注 → 生成 output_template Profile（base_xlsx_b64 存入）保存到本机；向导第三步仅从已存模板中选择。
   7. Service Worker：缓存 `public/pyodide/*`。
 - 验收：Vitest 全绿（含 detect_cases 共享用例）；mock 模式下完整向导流程人工可走通；`npm run build` 无 TS 错误；Profile 保存后刷新页面指纹复用生效。
 - 完成报告需额外包含：dev server 启动命令、mock 与真实 Worker 的切换方式说明（供 T4 使用）。

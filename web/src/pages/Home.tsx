@@ -1,9 +1,9 @@
-/** 落地页：一句话价值 + 隐私说明 + 开始按钮。见 docs/01-architecture.md #4 用户流程。 */
+/** 落地页：一句话价值 + 隐私说明 + 开始按钮 + 模板标注入口。见 docs/01-architecture.md #4 用户流程。 */
 import { Button, Card, Typography } from "antd";
 
 const { Title, Paragraph } = Typography;
 
-export function Home({ onStart }: { onStart: () => void }) {
+export function Home({ onStart, onTemplates }: { onStart: () => void; onTemplates: () => void }) {
   return (
     <div style={{ maxWidth: 720, margin: "64px auto", padding: "0 24px" }}>
       <Title level={2}>bomkit — BOM 转换与物料匹配</Title>
@@ -19,6 +19,9 @@ export function Home({ onStart }: { onStart: () => void }) {
       </Card>
       <Button type="primary" size="large" onClick={onStart}>
         开始转换
+      </Button>
+      <Button size="large" onClick={onTemplates} style={{ marginLeft: 16 }}>
+        标注输出模板
       </Button>
     </div>
   );
