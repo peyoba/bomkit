@@ -6,9 +6,9 @@ const { Title, Paragraph } = Typography;
 export function Home({ onStart }: { onStart: () => void }) {
   return (
     <div style={{ maxWidth: 720, margin: "64px auto", padding: "0 24px" }}>
-      <Title level={2}>bomkit — BOM 转换与物料匹配</Title>
+      <Title level={2}>bomkit — BOM 校对与标准化导出</Title>
       <Paragraph>
-        把任意 EDA 导出的 BOM 转换为你公司自有的 BOM 模板格式，并自动匹配企业物料库编码。
+        导入嘉立创 EDA、Altium 或 Cadence 的 BOM，对照企业物料库逐项确认差异，按你上传的模板导出。
       </Paragraph>
       <Card title="文件不出本机" style={{ marginBottom: 24 }}>
         <Paragraph>
@@ -17,6 +17,7 @@ export function Home({ onStart }: { onStart: () => void }) {
           确认转换过程中没有发起任何文件上传请求来验证这一点。
         </Paragraph>
       </Card>
+      <Paragraph>原型号始终保留。所有行都需要明确确认；修改候选或最终值后必须重新确认。没有确认完成时仅能导出待校对稿。</Paragraph>
       <Button type="primary" size="large" onClick={onStart}>
         开始转换
       </Button>

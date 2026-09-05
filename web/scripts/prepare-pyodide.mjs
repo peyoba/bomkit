@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * 构建脚本：把 Pyodide runtime + openpyxl/et_xmlfile/micropip/packaging wheel +
  * 本仓库 core/ 构建出的 bomcore wheel，全部复制到 web/public/pyodide/ 下自托管。
@@ -11,7 +11,8 @@
  *   - `pip install -e core/ && python -m build --wheel` 于 core/ 目录下
  *     生成 core/dist/bomcore-*.whl（本脚本会自动查找并复制最新一份）。
  */
-import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import https from "node:https";
@@ -97,8 +98,7 @@ async function main() {
   for (const file of PYODIDE_RUNTIME_FILES) {
     const src = path.join(pyodidePkgDir, file);
     if (!existsSync(src)) {
-      console.warn(`跳过缺失文件: ${file}`);
-      continue;
+      throw new Error(`Pyodide 包缺少文件: ${file}`);
     }
     copyFileSync(src, path.join(targetDir, file));
     console.log(`已复制 ${file}`);
@@ -133,6 +133,8 @@ async function main() {
     console.log(`已下载 ${name}`);
   }
 
+  const version = createHash("sha256").update(readFileSync(path.join(targetDir, bomcoreWheel))).digest("hex").slice(0, 16);
+  writeFileSync(path.join(targetDir, "bomcore-manifest.json"), JSON.stringify({wheel: bomcoreWheel, version}));
   console.log("\n完成。web/public/pyodide/ 内容：");
   for (const f of readdirSync(targetDir).sort()) {
     console.log(" -", f);

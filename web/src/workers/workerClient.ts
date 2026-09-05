@@ -19,11 +19,13 @@ import type {
   RenderArgs,
   WorkerErrorPayload,
 } from "../types/contracts";
+import type { ReviewAction } from "../types/review";
 
 export interface WorkerClient {
   detect(args: DetectArgs): Promise<DetectResult>;
   analyze(args: AnalyzeArgs): Promise<AnalyzeResult>;
   render(args: RenderArgs): Promise<Uint8Array>;
+  review<T>(action: ReviewAction, args?: Record<string, unknown>): Promise<T>;
 }
 
 export interface PyodideProgressEvent {
@@ -71,6 +73,7 @@ export function createPyodideWorkerClient(options: PyodideWorkerClientOptions = 
   const worker = new Worker(new URL("./pyodide.worker.ts", import.meta.url), { type: "module" });
 
   let nextId = 1;
+  let fatalError: WorkerCallError | null = null;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: unknown) => void }>();
 
   worker.onmessage = (event: MessageEvent<RawWorkerResponse>) => {
@@ -98,13 +101,16 @@ export function createPyodideWorkerClient(options: PyodideWorkerClientOptions = 
   worker.onerror = (event: ErrorEvent) => {
     // Worker 顶层未捕获异常（如加载脚本失败）：拒绝所有挂起请求，避免 UI 卡死等待。
     const err = new WorkerCallError("INTERNAL", event.message || "Pyodide Worker 发生未知错误");
+    fatalError = err;
+    options.onProgress?.({stage: "loading_runtime", progress: 0, error: err.message});
     for (const [id, handler] of pending) {
       handler.reject(err);
       pending.delete(id);
     }
   };
 
-  function call<TResult>(fn: "detect" | "analyze" | "render", args: unknown): Promise<TResult> {
+  function call<TResult>(fn: "detect" | "analyze" | "render" | "review", args: unknown): Promise<TResult> {
+    if (fatalError) return Promise.reject(fatalError);
     const id = nextId++;
     return new Promise<TResult>((resolve, reject) => {
       pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
@@ -116,5 +122,6 @@ export function createPyodideWorkerClient(options: PyodideWorkerClientOptions = 
     detect: (args: DetectArgs) => call<DetectResult>("detect", args),
     analyze: (args: AnalyzeArgs) => call<AnalyzeResult>("analyze", args),
     render: (args: RenderArgs) => call<Uint8Array>("render", args),
+    review: <T>(action: ReviewAction, args: Record<string, unknown> = {}) => call<T>("review", {action, ...args}),
   };
 }

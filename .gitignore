@@ -1,5 +1,10 @@
 # ── 公司真实数据（红线：永不入库）──
 core/tests/fixtures/private/
+# 用户提供的真实样例不得进入代码仓库（保留原路径，不移动用户文件）
+docs/*.xlsx
+docs/*.xls
+docs/*.rar
+docs/*.zip
 *.secret.*
 
 # ── Python ──

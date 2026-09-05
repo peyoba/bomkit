@@ -1,0 +1,22 @@
+[
+  {
+    "id": "jlc", "platform": "jlc", "name": "嘉立创 EDA",
+    "required_headers": ["designator", "quantity", "footprint", "name", "device"],
+    "column_map": {"designator": "designator", "quantity": "qty", "name": "value", "device": "mpn", "footprint": "footprint", "manufacturer": "manufacturer", "comment": "description", "secondary category": "category", "tolerance": "tolerance"}
+  },
+  {
+    "id": "cadence-detailed", "platform": "cadence", "name": "Cadence 明细表",
+    "required_headers": ["quantity", "value", "part reference", "pcb footprint"],
+    "column_map": {"quantity": "qty", "value": "value", "part reference": "designator", "pcb footprint": "footprint", "manufacturer part number": "mpn", "manufacturer": "manufacturer", "description": "description", "tolerance": "tolerance"}
+  },
+  {
+    "id": "cadence-report", "platform": "cadence", "name": "Cadence 汇总报告",
+    "required_headers": ["item", "quantity", "reference", "part", "pcb footprint"],
+    "column_map": {"quantity": "qty", "reference": "designator", "part": "value", "pcb footprint": "footprint"}
+  },
+  {
+    "id": "altium", "platform": "altium", "name": "Altium Designer",
+    "required_headers": ["comment", "pattern", "quantity", "components"],
+    "column_map": {"comment": "value", "pattern": "footprint", "quantity": "qty", "components": "designator"}
+  }
+]

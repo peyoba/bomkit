@@ -15,6 +15,7 @@ import analyzeExpected from "../../../core/tests/fixtures/contract/analyze_expec
 
 export function createMockWorkerClient(): WorkerClient {
   return {
+    review: () => Promise.reject(new Error("校对闭环不提供 mock，请使用真实 Python 引擎")),
     detect: ({ rows, kind }) => Promise.resolve(detect(rows, kind) as DetectResult),
     analyze: () => Promise.resolve(analyzeExpected as unknown as AnalyzeResult),
     render: () => Promise.reject(new Error("Mock Worker 不支持 render()：请在真实 Worker 接入后测试导出。")),

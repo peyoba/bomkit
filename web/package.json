@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/check-pyodide.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:e2e": "node scripts/test-review-e2e.mjs",
     "prepare:pyodide": "node scripts/prepare-pyodide.mjs"
   },
   "dependencies": {

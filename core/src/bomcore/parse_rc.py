@@ -11,10 +11,6 @@ import re
 
 # ── 封装表 ──
 
-KNOWN_PACKAGES = frozenset({
-    "0201", "0402", "0603", "0805", "1206", "1210", "1812", "2010", "2512", "3216", "6032",
-})
-
 # Imperial (EIA) package codes and their metric (IEC) equivalents refer to the
 # exact same physical footprint (e.g. imperial '0603' == metric '1608'), but a
 # BOM and a material spec don't always use the same convention. Without this
@@ -31,6 +27,20 @@ PACKAGE_METRIC_TO_IMPERIAL = {
     "5025": "2010",
     "6332": "2512",
 }
+
+_IMPERIAL_PACKAGES = frozenset({
+    "0201", "0402", "0603", "0805", "1206", "1210", "1806", "1812",
+    "2010", "2512", "6032",
+})
+
+# 识别门必须同时含公制码，否则上面那张映射表基本是死代码：extract_package
+# 早先只用英制集合过滤，9 个公制键里只有 '3216' 碰巧也在英制集合中，其余 8 个
+# 永远走不到 normalize_package。表现为公制表头的 BOM（R1608 / C2012 / C3225）
+# 解析出 package=None，param_fallback_search 的封装过滤整段被跳过，0402 的件
+# 可能被当成 0603 的唯一命中返回，且状态仍标"参数匹配"。
+# 注：封装过滤是软过滤（无命中则保留全部候选），故扩大识别集合只会让过滤更准，
+# 不会把今天能匹上的候选筛掉。
+KNOWN_PACKAGES = _IMPERIAL_PACKAGES | frozenset(PACKAGE_METRIC_TO_IMPERIAL)
 
 
 def normalize_package(package: str | None) -> str | None:

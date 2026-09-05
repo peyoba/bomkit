@@ -191,8 +191,23 @@ def guess_columns(
         confidence = None
 
         if normalized:
+            # kind 字段域必须在别名竞争「之前」生效，不能等选出赢家再作废。
+            # 真实故障（2026-08）：一个列名同时是「本 kind 允许」和「不允许」两个
+            # 字段的别名时，字母序里靠前的那个先赢，事后过滤把整列判为未猜出，
+            # 真正该中的字段永远没机会参与竞争。表现为必填列凭空消失、
+            # analyze() 直接抛 MISSING_REQUIRED_FIELD：
+            #   BOM「名称」    → name 先赢(不允许) → value 丢失
+            #   物料「型号」    → mpn  先赢(不允许) → spec  丢失
+            #   物料「物料编码」→ source_code 先赢(不允许) → code 丢失
+            # TS 侧 detect.ts 的 pickGuessField 一直是在循环内过滤的正确写法，
+            # 这里对齐它——双端同判是契约 5.2 的硬要求。
+            scoped_fields = [
+                field for field in sorted(aliases)
+                if allowed_fields is None or field in allowed_fields
+            ]
+
             # 1) 别名词库精确命中；field 字母序保证双端一致
-            for field in sorted(aliases):
+            for field in scoped_fields:
                 if normalized in aliases[field]:
                     guess_field = field
                     confidence = "high"
@@ -200,7 +215,7 @@ def guess_columns(
 
             # 2) 词库包含式命中
             if guess_field is None:
-                for field in sorted(aliases):
+                for field in scoped_fields:
                     for word in aliases[field]:
                         if len(word) < 2:
                             continue
@@ -221,8 +236,8 @@ def guess_columns(
             guess_field = None
             confidence = None
 
-        # 5) kind 字段域过滤：不属于该类输入的猜测一律视为未猜出，
-        #    让源列落入 extras 透传而不是被解析器静默丢弃。
+        # 5) kind 字段域兜底：正常情况下步骤 1/2 已只在允许字段里挑选，
+        #    此处仅防御「别名之外的其他猜测来源」将来被加进来时越界。
         if guess_field is not None and allowed_fields is not None and guess_field not in allowed_fields:
             guess_field = None
             confidence = None

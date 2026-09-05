@@ -330,7 +330,13 @@ def render(final_items: list[dict], output_profile: dict, meta: dict | None = No
                     cell.fill = FILL_DNP
 
             # 单元格级"缺失"高亮优先于行底色（契约第 7 节：编码/规格缺失单元格 -> 黄）。
-            has_device = bool(cell_text(fields.get("mpn", "")))
+            # "这一行本该有编码" 的判据必须与 api.py 送去匹配的字段口径完全一致：
+            # api.analyze 用的是 `mpn or value`（立创EDA 导出没有独立型号列，型号信息
+            # 落在 Name/元件值列里，故有此回退）。此处若只看 mpn，则这类表的未匹配行
+            # 照样参与了匹配、却拿不到黄色"编码缺失"提示，用户会整批漏改。
+            has_device = bool(
+                cell_text(fields.get("mpn", "")) or cell_text(fields.get("value", ""))
+            )
             eligible_for_missing = (
                 missing_highlight and has_material and has_device
                 and row_info["level"] not in ("non_component",)

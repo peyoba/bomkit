@@ -42,6 +42,10 @@ async function initPyodide(): Promise<PyodideInterface> {
   reportProgress("installing_packages", 60);
 
   const micropip = pyodide.pyimport("micropip");
+  const manifestResponse = await fetch(`${PYODIDE_BASE}bomcore-manifest.json`, {cache: "no-store"});
+  if (!manifestResponse.ok) throw new Error("缺少转换引擎版本清单，请重新运行 prepare:pyodide");
+  const manifest = await manifestResponse.json() as {wheel: string; version: string};
+  if (!/^bomcore-[A-Za-z0-9_.-]+\.whl$/.test(manifest.wheel) || !/^[a-f0-9]+$/.test(manifest.version)) throw new Error("引擎版本清单无效");
   // 显式传本地 wheel 的绝对 URL，跳过 micropip 默认的 PyPI/CDN 索引查询——
   // 这几个包在 PYODIDE_BASE 下已经就绪（prepare-pyodide.mjs 产物）。
   await micropip.install.callKwargs(
@@ -49,7 +53,7 @@ async function initPyodide(): Promise<PyodideInterface> {
       `${PYODIDE_BASE}packaging-23.2-py3-none-any.whl`,
       `${PYODIDE_BASE}et_xmlfile-2.0.0-py3-none-any.whl`,
       `${PYODIDE_BASE}openpyxl-3.1.5-py2.py3-none-any.whl`,
-      `${PYODIDE_BASE}bomcore-0.1.0-py3-none-any.whl`,
+      `${PYODIDE_BASE}${manifest.wheel}?v=${manifest.version}`,
     ],
     { keep_going: true }
   );
@@ -73,7 +77,7 @@ getPyodide().catch((err) => {
 
 interface WorkerRequestMessage {
   id: number;
-  fn: "detect" | "analyze" | "render";
+  fn: "detect" | "analyze" | "render" | "review";
   args: unknown;
 }
 
@@ -90,10 +94,21 @@ function toErrorPayload(err: unknown): { code: string; message: string } {
   return { code: "INTERNAL", message: text };
 }
 
-self.onmessage = async (event: MessageEvent<WorkerRequestMessage>) => {
-  const { id, fn, args } = event.data;
+async function handleRequest({ id, fn, args }: WorkerRequestMessage) {
   try {
     const pyodide = await getPyodide();
+    if (fn === "review") {
+      const {action, ...params} = args as Record<string, unknown>;
+      const api = pyodide.pyimport("bomcore.review_api");
+      const pyArgs = pyodide.toPy(params);
+      let output;
+      try {
+        output = api.dispatch(action, pyArgs);
+        const result = output.toJs({dict_converter: Object.fromEntries});
+        self.postMessage({id, ok: true, result});
+      } finally { output?.destroy(); pyArgs.destroy(); api.destroy(); }
+      return;
+    }
     const bomcoreApi = pyodide.pyimport("bomcore.api");
 
     // 关键：普通 JS 对象/数组传给 Python 函数时，Pyodide 默认只包一层 JsProxy，
@@ -143,4 +158,9 @@ self.onmessage = async (event: MessageEvent<WorkerRequestMessage>) => {
   } catch (err) {
     self.postMessage({ id, ok: false, error: toErrorPayload(err) });
   }
+}
+// 同一会话的修改、确认、导出严格顺序执行，避免冷加载期间请求交叉。
+let queue = Promise.resolve();
+self.onmessage = (event: MessageEvent<WorkerRequestMessage>) => {
+  queue = queue.then(() => handleRequest(event.data));
 };

@@ -1,43 +1,81 @@
-# bomkit — 通用 BOM 转换与物料匹配工具
+# bomkit — BOM 校对与标准化导出
 
-> 工作名 bomkit，产品名待定。当前处于**文档/设计阶段**，尚无代码。
+将嘉立创 EDA、Altium Designer、Cadence 的已验证导出格式导入本机，对照企业物料库，标注差异，由用户明确确认后按已有 Excel 模板输出。
 
-## 这是什么
+## 已实现
 
-把任意 EDA 导出的 BOM（嘉立创 EDA / KiCad / Altium / 立创EDA 标准版等）转换为任意公司自有的 BOM 模板格式，并自动匹配企业自有物料库（金蝶等 ERP 导出表）的物料编码。
+- Excel、TXT/TSV/CSV 输入，自动识别三平台的已知模板和前置报表标题；Cadence 逐件与汇总形式均保留源行，不擅自合并。
+- 物料库查码与型号/参数候选，排除禁用物料，保留前导零；没有匹配时允许人工搜索或明确保留原文。
+- 原型号、库规格、最终值并排核对；任何修改都会撤销确认。所有行确认前仅可导出待校对稿。
+- 上传用户已有中文 BOM 模板，保留列布局与样式，清除旧明细和页脚；输出含校对记录与原始输入两张附表。
+- 浏览器本地 Pyodide Worker，无后端文件上传。模板和文件不自动保存到云端。
 
-核心卖点：
+## 本地运行
 
-1. **文件不出本机**：纯前端本地处理（Pyodide 在浏览器内运行 Python 核心），无服务器、无上传，隐私可被用户用开发者工具验证。
-2. **可视化列映射**：上传表格自动识别表头（别名词库 + 内容验证 + 置信度），用户在界面确认/修正映射，配置自动保存、指纹命中后自动复用。
-3. **输出模板"上传 + 标注"**：用户上传自己公司现有模板 Excel，标注数据区与列对应关系，工具保留原样式填数——不做从零画模板的编辑器。
-4. **智能匹配引擎**：五级级联匹配（精确/型号/子串/清洗重试/参数匹配），电阻电容支持"值+封装+精度"参数匹配，多候选在线单选修正。
+需要 Python ≥3.10（推荐3.12）和 Node ≥20.19（已验证22）。本机系统默认 python3 可能是3.9，请显式选择合适版本。
 
-## 前身
+在仓库根执行：
 
-本项目由公司内部工具 jlc_bom_converter 通用化改造而来。旧仓库（只读参考，勿修改）：
-`/Users/peyoba/Documents/Obsidian Vault/项目/jlc_bom_converter/jlc_bom_converter`
+    uv venv .venv --python 3.12
+    uv pip install --python .venv/bin/python -e './core[dev]' -e './cli' setuptools wheel
+    .venv/bin/python -m build --wheel --no-isolation core
+    cd web
+    npm ci
+    npm run prepare:pyodide
+    npm run dev -- --host 127.0.0.1
 
-旧核心 `jlc_bom_converter_core.py` 已在真实生产验证，其中的匹配算法与边界 case 处理是本项目最重要的继承资产，迁移要求见 `docs/05-migration-map.md`。
+浏览器打开终端显示的本机地址。首次依赖准备需要联网下载公开运行时；实际使用过程不会向这些服务发送 BOM。修改 Python 核心后必须重新打 wheel 和 prepare:pyodide，再刷新浏览器。
 
-## 文档索引（开发代理必读）
+生产产物本机验证：
 
-按顺序阅读：
+    cd web
+    npm run build
+    npm run preview -- --host 127.0.0.1
 
-1. `docs/01-architecture.md` — 关键决策、目标架构、仓库结构、技术栈
-2. `docs/02-contracts.md` — **契约文档（冻结）**：标准中间模型、Profile 格式、Worker API、指纹算法。所有代理的共同依据，改动需升版本并同步全体
-3. `docs/03-milestones.md` — 里程碑、验收门、验证策略、风险
-4. `docs/04-agent-tasks.md` — **任务卡**：每张卡可直接作为一个开发代理的任务书，含边界、交付物、验收标准
-5. `docs/05-migration-map.md` — 旧代码 → 新模块迁移映射、必须保留的边界 case 清单（core 代理专用）
+prebuild 会阻止缺失运行时或未重新打包的旧核心产物。当前主包约1.38MB，仍有分包优化空间。
 
-## 给任务分发者（人类或编排代理）
+## 使用步骤
 
-- 任务依赖关系与建议执行顺序见 `docs/04-agent-tasks.md` 开头的依赖图：T0 先行，T1/T2/T3 并行，T4 集成，T5 发布。
-- 每个代理开工前必须读 `docs/02-contracts.md` 与自己任务卡中列出的文档。
-- 多代理并行修改本仓库时，每个代理使用独立 git worktree + 分支（各任务卡已写明命令）。
+1. 选择三平台 BOM 和可选企业物料表；多工作表可切换。核对识别出的平台和表头行。
+2. 选择已给定布局的中文模板，填写本次标题和套数（默认1，不沿用模板的旧8套/9套）。
+3. 开始校对，逐行查看所有原字段、库规格、最终值及提示。需要时搜索候选或手改最终编码/型号；填写校对人，勾选确认。
+4. 未确认可导出待校对稿；全部确认后导出正式结果。未关联库/缺编码/缺封装等情况需填写保留原因，工具不会编造值。
+5. 重新导入会清空会话确认。当前不跨刷新保存会话，请先导出校对稿留存；它不是可重新导入的确认凭证。
 
-## 红线（所有代理必须遵守）
+## 测试
 
-- **禁止把公司真实数据提交进 git**：真实 BOM/金蝶物料表/公司模板 xlsx 只能放在 `core/tests/fixtures/private/`（已 gitignore），公开 fixture 一律用脱敏合成数据。
-- 旧仓库只读，任何情况下不得修改。
-- 不修改 `docs/02-contracts.md` 中已冻结的契约；发现契约缺陷时停下来向任务分发者报告，而不是自行变更。
+公开合成测试：
+
+    .venv/bin/python -m pytest core/tests -q
+    cd web && npm test && npm run lint
+
+真实浏览器回归（先启动本机 dev 或 preview）：
+
+    cd web
+    npm run test:e2e
+
+若 Chromium 未安装：npm exec playwright install chromium。E2E 使用真正 Pyodide，不提供 mock 校对；自动确认仅用合成数据。
+
+私有矩阵仅在已获授权的样例存在时运行，资料和产物均被 Git 忽略：
+
+    .venv/bin/python core/tests/private_regression.py
+    cd web
+    BOMKIT_PRIVATE_TESTS=1 npm test
+    BOMKIT_PRIVATE_TESTS=1 npm run test:e2e
+
+指定生产preview地址可设置 BOMKIT_E2E_URL=http://127.0.0.1:4173/ 。私有输入位置与命名见 docs/07-validation.md。
+
+## 验收边界
+
+代码闭环、单测、真实浏览器、私有输出回读可以证明软件行为；不能证明某个真实元件选型一定正确。真实输出仍需要工程人员逐行校对。脚本生成的“技术模拟禁止投产”文件不是业务审核结果。
+
+仅支持已验证的导出/中文模板结构，不是任意模板设计器。未知 PART_NUMBER 不自动认作企业编码。原 v1 CLI 为兼容入口，不含新人工确认门禁；需要门禁请使用网页 v2。
+
+## 文档与数据红线
+
+- docs/06-review-contract-v2.md：新闭环契约，优先用于本次功能。
+- docs/07-validation.md：实测证据、复现命令、验收范围。
+- docs/01-architecture.md、03-milestones.md、04-agent-tasks.md、05-migration-map.md：历史设计和迁移参考，未做的旧宏大范围不自动算首版已交付。
+- docs/02-contracts.md：v1 原文冻结，新API独立实现，不改旧契约。
+- 公司真实输入/模板/输出只放 core/tests/fixtures/private/；docs 中已提供的表格/压缩包也已 Git 忽略，禁止提交。
+- 前身 jlc_bom_converter 仅只读参考，未修改。
