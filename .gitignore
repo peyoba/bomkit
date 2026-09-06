@@ -5,6 +5,7 @@ docs/*.xlsx
 docs/*.xls
 docs/*.rar
 docs/*.zip
+docs/bom资料/
 *.secret.*
 
 # ── Python ──

@@ -55,7 +55,8 @@ def verify(data: bytes, session: ReviewSession, template: str, mode: str) -> dic
         if "物料编码" in cols:
             assert (ws.cell(offset, cols["物料编码"]).value or "") == item["final"]["code"]
         state = ws.cell(offset, cols["校对状态"]).value
-        assert state == ("已人工确认" if mode == "final" else "待校对（不可投产）")
+        expected_state = "已人工确认" if item["confirmed"] else (None if item["export_ready"] else "待校对（不可投产）")
+        assert state == expected_state
     source = wb["原始输入"]
     for r, row in enumerate(session.raw_rows, 1):
         for c, value in enumerate(row, 1):
@@ -87,12 +88,13 @@ def main():
         assert len(s.items) == expected_rows
         assert sum(i["fields"]["qty"] for i in s.items) == expected_quantity
         assert s.material_stats["total"] == 17371
+        initial_stats = s.snapshot()["stats"]
         blocked = False
         try:
             export_review(s, mode="final")
         except ProfileError as e:
             blocked = e.code == "CONFIRMATION_REQUIRED"
-        assert blocked, "未确认正式导出未被阻止"
+        assert blocked == (initial_stats["pending"] > 0), "正式导出门禁与未处理问题不一致"
         checks = []
         for template in TEMPLATES:
             encoded = base64.b64encode((INPUTS / template).read_bytes()).decode()
@@ -136,6 +138,7 @@ def main():
                 "quantity": expected_quantity,
                 "elapsed_s": round(time.monotonic() - started, 3),
                 "unconfirmed_blocked": True,
+                "initial_stats": initial_stats,
                 "edited_confirmation_invalidated": True,
                 "outputs": checks,
             }

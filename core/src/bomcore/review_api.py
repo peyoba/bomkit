@@ -10,6 +10,7 @@ from collections import defaultdict
 from .matching import build_material_rc_index, match_device
 from .models import MaterialItem
 from .review_import import detect_input, import_bom, normalize_header, validate_rows
+from .review_rules import candidate_findings, finding, material_evidence, model_key, rc_value, source_findings
 from .schema import ProfileError
 
 
@@ -103,8 +104,24 @@ class ReviewSession:
         self.materials, self.material_stats = import_materials(material_rows)
         self.by_id = {m["id"]: m for m in self.materials}
         self.by_signature = defaultdict(list)
+        self.by_model = defaultdict(list)
+        self.by_rc = defaultdict(list)
+        self.evidence = {}
+        code_signatures = defaultdict(set)
+        self.jlc = self.profile["platform"] == "jlc"
         for m in self.materials:
             self.by_signature[(m["code"], m["name"], m["spec"])].append(m)
+            evidence = material_evidence(m)
+            self.evidence[m["id"]] = evidence
+            for key in {model_key(t, self.jlc) for t in [m["spec"], *evidence["tokens"]]}:
+                if key:
+                    self.by_model[key].append(m)
+            if evidence["rc"]:
+                self.by_rc[evidence["rc"][:2]].append(m)
+            code_signatures[m["code"]].add(tuple(m[k] for k in ("name", "spec", "footprint", "tolerance", "manufacturer")))
+        self.conflicting_codes = {code for code, signatures in code_signatures.items() if len(signatures) > 1}
+        self.qualified = {}
+        self.possible = {}
         self.material_fingerprint = _fingerprint(self.materials)
         materials = [
             MaterialItem(code=m["code"], name=m["name"], spec=m["spec"]) for m in self.materials if m["spec"].strip()
@@ -113,7 +130,7 @@ class ReviewSession:
         cache = {}
         for item in self.items:
             f = item["fields"]
-            key = (item["original_model"], f["value"], f["footprint"], f["tolerance"])
+            key = (item["original_model"], f["value"], f["footprint"], f["tolerance"], f["manufacturer"])
             if key not in cache:
                 result = match_device(key[0], materials, rc_index, name=key[1], footprint=key[2], tolerance=key[3])
                 # 库器件名未命中时才尝试原始值；每次匹配只作为建议，不覆盖原文。
@@ -131,12 +148,31 @@ class ReviewSession:
             candidates = []
             for c in result["candidates"]:
                 candidates.extend(self.by_signature[(c["code"], c["name"], c["spec"])])
+            # 搜索只提供线索。另以完整型号/精确数值查全候选，避免 v1 软过滤
+            # 漏掉正确封装，或把第一个高排名候选误认为“唯一正确”。
+            primary_rc = rc_value(item["original_model"])
+            strong_pool = (
+                self.by_rc.get(primary_rc[:2], []) if primary_rc
+                else self.by_model.get(model_key(item["original_model"], self.jlc), [])
+            )
+            candidates.extend(strong_pool)
             candidates = list({c["id"]: c for c in candidates}.values())
-            candidates.sort(key=lambda c: (not c["code"].startswith("01."), c["code"], c["id"]))
+            # 同编码且各属性完全相同的重复导出行不制造人工选择任务。
+            candidates = list({tuple(c[k] for k in ("code", "name", "spec", "footprint", "tolerance", "manufacturer")): c for c in candidates}.values())
+            assessments = {c["id"]: self._candidate_findings(item, c) for c in candidates}
+            candidates.sort(key=lambda c: (len(assessments[c["id"]][0]), not c["code"].startswith("01."), c["code"], c["id"]))
+            qualified = [c["id"] for c in candidates if not assessments[c["id"]][0]]
+            self.qualified[item["row_id"]] = qualified
+            contradictions = {"model_mismatch", "value_mismatch", "package_mismatch", "property_mismatch", "manufacturer_mismatch"}
+            self.possible[item["row_id"]] = [
+                c["id"] for c in candidates
+                if not any(p["code"] in contradictions for p in assessments[c["id"]][0])
+            ]
             item.update(
                 {
                     "candidates": copy.deepcopy(candidates[:50]),
                     "candidate_count": len(candidates),
+                    "qualified_count": len(qualified),
                     "match_level": result["level"] if self.materials else "skipped",
                     "match_label": result["status_text"] if self.materials else "未提供物料库",
                     "selected_id": candidates[0]["id"] if candidates else None,
@@ -176,44 +212,72 @@ class ReviewSession:
             }
         )
 
+    def _candidate_findings(self, item: dict, candidate: dict) -> tuple[list[dict], str]:
+        problems, basis = candidate_findings(item, candidate, self.evidence[candidate["id"]], self.jlc)
+        if candidate["code"] in self.conflicting_codes:
+            problems.append(finding(
+                "duplicate_code", "code", "物料编码", item["fields"]["source_code"],
+                candidate["code"], "同一库编码对应不同规格或属性，需先确定使用哪条记录",
+            ))
+        return problems, basis
+
     def _refresh(self, item: dict) -> None:
         candidate = self.by_id.get(item["selected_id"])
         item["selected_material"] = copy.deepcopy(candidate)
-        differences = list(item["issues"])
+        problems = source_findings(item)
+        basis = ""
         if candidate is None:
-            differences.append("尚未关联企业物料，需人工确认保留原型号或手动校对")
+            problems.append(finding(
+                "unmatched", "model", "物料对应关系", item["original_model"], "",
+                "未找到可确定对应的库记录，需选料或说明保留原文的原因",
+            ))
         else:
-            if item["original_model"] != candidate["spec"]:
-                differences.append("BOM 原型号与库规格原文不同（含空格/大小写差异）")
-            f = item["fields"]
-            if f["value"] and f["value"] != item["original_model"] and f["value"] != candidate["spec"]:
-                differences.append("BOM 另有原始元件值/参数，与型号列不同，请对照库规格核对")
-            for field, label in (("footprint", "封装"), ("tolerance", "精度"), ("manufacturer", "厂商")):
-                original, library = f.get(field, ""), candidate.get(field, "")
-                if original and library and original != library:
-                    differences.append(f"{label}原文不同")
-                elif original and not library:
-                    differences.append(f"库中无独立{label}字段，请结合规格原文核对")
-                elif library and not original:
-                    differences.append(f"BOM 缺少{label}而库中有值，不自动补入")
-            if item["candidate_count"] > 1:
-                differences.append("存在多个推荐候选，必须明确选择")
-        final = item["final"]
-        if final["model"] != item["original_model"]:
-            differences.append("最终型号不同于 BOM 原型号")
-        if final["footprint"] != item["fields"]["footprint"]:
-            differences.append("最终封装不同于 BOM 原封装")
-        if candidate and (
-            final["code"] != candidate["code"]
-            or final["model"] != candidate["spec"]
-            or final["name"] != candidate["name"]
-            or (candidate["footprint"] and final["footprint"] != candidate["footprint"])
-        ):
-            differences.append("最终值经过手动校对，与所选库记录不同")
-        item["differences"] = list(dict.fromkeys(differences))
+            checks, basis = self._candidate_findings(item, candidate)
+            problems.extend(checks)
+            qualified = self.qualified[item["row_id"]]
+            possible = self.possible[item["row_id"]]
+            if len(possible) > 1:
+                codes = [self.by_id[c]["code"] for c in possible]
+                reason = (
+                    f"有 {len(qualified)} 条库记录同样符合现有信息，尚不能唯一确定编码"
+                    if len(qualified) == len(possible)
+                    else f"还有信息不完整的候选不能排除，共 {len(possible)} 条可能记录，尚不能唯一确定编码"
+                )
+                problems.append(finding(
+                    "ambiguous", "code", "候选编码", item["original_model"],
+                    " / ".join(codes[:8]) + (" …" if len(codes) > 8 else ""),
+                    reason,
+                ))
+            elif not checks and candidate["id"] not in qualified:
+                problems.append(finding(
+                    "unverified_selection", "code", "手选物料", item["original_model"], candidate["code"],
+                    "手选记录不在已唯一核实的候选范围内，需确认本次选择",
+                ))
+        suggested = self._suggested_final(item, candidate)
+        for field, label in (("code", "编码"), ("name", "名称"), ("model", "型号"), ("footprint", "封装")):
+            # 人工输出改动与自动补全分开；不再笼统重复“最终型号不同于原型号”。
+            if item["final"][field] != suggested[field]:
+                original = {
+                    "model": item["original_model"], "code": item["fields"]["source_code"],
+                    "name": item["fields"]["category"], "footprint": item["fields"]["footprint"],
+                }[field]
+                problems.append(finding(
+                    "edited_final", field, f"最终{label}", original, suggested[field],
+                    f"最终{label}已手动改为其他值，需确认本次输出", item["final"][field],
+                ))
+        item["review_findings"] = problems
+        item["differences"] = [
+            f'{p["label"]}：{p["reason"]}；BOM：{p["original"] or "（空）"}；库/参考：{p["library"] or "（无）"}'
+            + (f'；最终：{p["final"]}' if p["final"] else "")
+            for p in problems
+        ]
         if item["confirmed"] and item["confirmation"]["fingerprint"] != self._signature(item):
             item["confirmed"] = False
             item["confirmation"] = None
+        item["requires_review"] = bool(problems)
+        item["review_status"] = "confirmed" if item["confirmed"] else ("needs_review" if problems else "auto_passed")
+        item["export_ready"] = item["confirmed"] or not problems
+        item["auto_pass_basis"] = f"唯一库记录；{basis}" if not problems else ""
 
     def update(self, row_id: int, patch: dict) -> dict:
         item = self._get(row_id)
@@ -239,8 +303,9 @@ class ReviewSession:
             if not isinstance(patch["note"], str) or len(patch["note"]) > 2000:
                 raise ProfileError("INVALID_ROWS", "校对说明不得超过 2000 字符")
             updated["note"] = patch["note"]
-        updated["confirmed"] = False
-        updated["confirmation"] = None
+        if self._signature(updated) != self._signature(item):
+            updated["confirmed"] = False
+            updated["confirmation"] = None
         self._refresh(updated)
         self.items[row_id] = updated
         return copy.deepcopy(updated)
@@ -249,6 +314,9 @@ class ReviewSession:
         from datetime import datetime, timezone
 
         item = self._get(row_id)
+        self._refresh(item)
+        if not item["requires_review"]:
+            return copy.deepcopy(item)  # 确定项不伪造人工确认记录。
         if not isinstance(reviewer, str) or not reviewer.strip() or len(reviewer) > 100:
             raise ProfileError("CONFIRMATION_REQUIRED", "请填写校对人")
         if note is not None:
@@ -280,17 +348,22 @@ class ReviewSession:
                 "note": item["note"],
             }
         )
+        self._refresh(item)
         return copy.deepcopy(item)
 
     def invalidate(self, row_id: int) -> dict:
-        return self.update(row_id, {})
+        item = self._get(row_id)
+        item["confirmed"] = False
+        item["confirmation"] = None
+        self._refresh(item)
+        return copy.deepcopy(item)
 
     def assert_confirmed(self) -> None:
         for item in self.items:
             self._refresh(item)
-        pending = sum(not i["confirmed"] for i in self.items)
+        pending = sum(not i["export_ready"] for i in self.items)
         if pending:
-            raise ProfileError("CONFIRMATION_REQUIRED", f"还有 {pending} 行未确认，只能导出待校对稿")
+            raise ProfileError("CONFIRMATION_REQUIRED", f"还有 {pending} 项问题未确认，只能导出待校对稿")
 
     def search(self, query: str, limit: int = 30) -> dict:
         if not isinstance(query, str) or not query.strip():
@@ -318,7 +391,8 @@ class ReviewSession:
                 "rows": len(self.items),
                 "quantity": sum(i["fields"]["qty"] for i in self.items),
                 "confirmed": sum(i["confirmed"] for i in self.items),
-                "pending": sum(not i["confirmed"] for i in self.items),
+                "auto_passed": sum(i["review_status"] == "auto_passed" for i in self.items),
+                "pending": sum(not i["export_ready"] for i in self.items),
             },
         }
 

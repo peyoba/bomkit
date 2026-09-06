@@ -24,6 +24,7 @@ prepare 前需先在仓库根用 .venv/bin/python -m build --wheel --no-isolatio
 
 - src/lib/reviewInput.ts：XLSX/TXT解码、范围修复、预设识别；预设与Python共用JSON。
 - src/pages/ReviewWorkspace.tsx：导入、源/库/最终值并排校对和导出。
+- src/components/ReviewFindings.tsx：列表与详情共用字段证据；确定项不渲染标签或警告。默认问题筛选和正式导出门禁均以 export_ready 判断，不能用 confirmed=false 判断“待校对”。
 - src/workers/pyodide.worker.ts：自托管runtime、串行会话动作、释放临时Python代理。
 - src/types/review.ts：独立v2类型，不修改v1冻结契约。
 - scripts/test-review-e2e.mjs：可重复的真实引擎浏览器回归。

@@ -31,14 +31,17 @@ const modal=page.locator('.ant-modal');
 async function enabled(name) {await page.waitForFunction(s=>{const e=document.querySelector(s);return e&&!e.disabled;},'[data-testid="'+name+'"]',{timeout:120000});}
 async function reset() {await page.getByRole('button',{name:'重新导入（清空确认）',exact:true}).click();await page.locator('#bom-file').waitFor();}
 function fixture(name,rows) {const w=XLSX.utils.book_new();XLSX.utils.book_append_sheet(w,XLSX.utils.aoa_to_sheet(rows),'合成表');return {name,mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:XLSX.write(w,{type:'buffer',bookType:'xlsx'})};}
-async function start(bom,material,template,rows,quantity) {
+async function start(bom,material,template,rows,quantity,pending=null) {
   await page.locator('#bom-file').setInputFiles(bom);
   if(material) await page.locator('#material-file').setInputFiles(material);
   await id('template-file').setInputFiles(template || []);
   await page.getByLabel('输出标题',{exact:true}).fill('自动化技术验证 · 禁止投产');
   await enabled('start-review');await id('start-review').click();await id('row-summary').waitFor({timeout:120000});
   assert.equal(await id('row-summary').innerText(),rows+' 行 / 数量合计 '+quantity);
-  assert.equal(await id('export-final').isDisabled(),true);
+  if(pending!==null) {
+    assert.equal(await id('pending-summary').innerText(),'需确认 '+pending);
+    assert.equal(await id('export-final').isDisabled(),pending>0);
+  }
   assert.deepEqual(await page.locator('.ant-alert-error').allTextContents(),[]);
 }
 async function download(button,name,count,total) {
@@ -59,6 +62,7 @@ try {
     ['Designator','Quantity','Name','Device','Footprint','Comment'],
     ['R1','1','10kΩ','SYNTHETIC-MODEL-A','0603',''],
     ['U1','1','SYNTHETIC-UNKNOWN','SYNTHETIC-UNKNOWN','QFN16',''],
+    ['R2','1','10kΩ','SYNTHETIC-MODEL-A','0805',''],
   ]);
   const materials=fixture('synthetic-material.xlsx',[
     ['编码','名称','规格型号','禁用状态','封装'],
@@ -70,16 +74,26 @@ try {
     ['旧项目标题'],['序号','名称','数量','位号','型号','封装','物料编码','需求8'],
     [1,'旧明细',100,'OLD1','OLD-MODEL','OLD-PACKAGE','OLD-CODE',800],['旧页脚'],
   ]);
-  await start(bom,materials,template,2,2);
-  const draft=await download('export-draft','synthetic-draft.xlsx',2,2);
+  await start(bom,materials,template,3,3,2);
+  assert.equal(await id('automatic-summary').innerText(),'无需人工确认 1');
+  assert.equal(await id('review-row-0').count(),0,'确定项默认不进入问题列表');
+  assert.ok((await page.locator('main').innerText()).includes('封装不一致'));
+  await page.screenshot({path:path.join(output,'synthetic-problems.png'),fullPage:true,animations:'disabled'});
+  const draft=await download('export-draft','synthetic-draft.xlsx',3,3);
   assert.ok(!JSON.stringify(draft.w.Sheets[draft.w.SheetNames[0]]).includes('OLD-MODEL'));
-  await id('review-row-0').click();await modal.waitFor();
+  assert.equal(draft.rows[0][draft.header.indexOf('校对状态')],'','确定项不标注');
+  await id('review-row-2').click();await modal.waitFor();
   assert.equal(await id('confirm-row').isDisabled(),true);
-  assert.ok((await modal.innerText()).includes('BOM 原型号与库规格原文不同'));
+  assert.ok((await modal.innerText()).includes('封装不一致'));
+  assert.ok((await modal.innerText()).includes('0805'));
+  assert.ok((await modal.innerText()).includes('0603'));
   await modal.getByLabel('校对人',{exact:true}).fill('自动化模拟校对员');
   await modal.getByLabel('校对说明',{exact:true}).fill('仅合成数据技术测试');
-  await modal.getByRole('checkbox').check();await id('confirm-row').click();await modal.waitFor({state:'hidden'});
-  assert.equal(await id('pending-summary').innerText(),'待校对 1');
+  await modal.getByRole('checkbox').check();
+  await modal.screenshot({path:path.join(output,'synthetic-problem-detail.png'),animations:'disabled'});
+  await id('confirm-row').click();await modal.waitFor({state:'hidden'});
+  assert.equal(await id('pending-summary').innerText(),'需确认 1');
+  assert.equal(await id('review-row-2').count(),0,'已处理项退出问题列表');
   await id('review-row-1').click();await modal.waitFor();
   await modal.getByLabel('搜索物料库',{exact:true}).fill('SYNTHETIC-ALTERNATIVE');
   await modal.getByLabel('搜索物料库',{exact:true}).press('Enter');
@@ -90,17 +104,22 @@ try {
   await modal.getByLabel('校对说明',{exact:true}).fill('合成数据：验证搜索选取和差异确认');
   await modal.getByRole('checkbox').check();await id('confirm-row').click();await modal.waitFor({state:'hidden'});
   await enabled('export-final');
-  const final=await download('export-final','synthetic-confirmed.xlsx',2,2);
-  assert.deepEqual(final.rows.map(r=>r[final.header.indexOf('物料编码')]),['01.000001','09.000002']);
-  assert.deepEqual(final.rows.map(r=>r[final.header.indexOf('型号')]),['SYNTHETIC-MODEL-A/0603','SYNTHETIC-ALTERNATIVE']);
-  assert.ok(final.rows.every(r=>r[final.header.indexOf('校对状态')]==='已人工确认'));
+  const final=await download('export-final','synthetic-confirmed.xlsx',3,3);
+  assert.deepEqual(final.rows.map(r=>r[final.header.indexOf('物料编码')]),['01.000001','09.000002','01.000001']);
+  assert.deepEqual(final.rows.map(r=>r[final.header.indexOf('型号')]),['SYNTHETIC-MODEL-A/0603','SYNTHETIC-ALTERNATIVE','SYNTHETIC-MODEL-A/0603']);
+  assert.deepEqual(final.rows.map(r=>r[final.header.indexOf('校对状态')]),['','已人工确认','已人工确认']);
+  await page.getByRole('checkbox',{name:'只看需确认项',exact:true}).uncheck();
+  await id('review-row-0').click();await modal.waitFor();
+  assert.equal(await id('confirm-row').count(),0,'确定项详情不显示确认按钮');
+  assert.equal(await modal.locator('[data-testid="review-findings"]').count(),0,'确定项不显示问题警告');
+  await modal.getByRole('button',{name:'关闭',exact:true}).click();await modal.waitFor({state:'hidden'});
   await id('review-row-1').click();await modal.waitFor();
   assert.ok((await modal.innerText()).includes('SYNTHETIC-ALTERNATIVE'));
   await modal.getByLabel('最终型号 / 规格',{exact:true}).fill('SYNTHETIC-MODIFIED');
-  await modal.getByRole('button',{name:'保存修改（不确认）',exact:true}).click();
+  await modal.getByRole('button',{name:'保存并重新检查',exact:true}).click();
   await modal.getByRole('button',{name:'关闭',exact:true}).click();await modal.waitFor({state:'hidden'});
-  assert.equal(await id('export-final').isDisabled(),true);assert.equal(await id('pending-summary').innerText(),'待校对 1');
-  report.cases.push({name:'synthetic-confirmation',passed:true,checks:['真实Pyodide','草稿下载','差异显示','勾选确认门禁','搜索候选','编码型号回读','修改撤销确认']});
+  assert.equal(await id('export-final').isDisabled(),true);assert.equal(await id('pending-summary').innerText(),'需确认 1');
+  report.cases.push({name:'synthetic-confirmation',passed:true,checks:['真实Pyodide','确定项零点击无标注','默认只显示问题','字段原值库值与原因','只确认问题项即可正式导出','搜索候选','编码型号回读','修改撤销确认']});
   console.log('Synthetic real-Pyodide confirmation/download/invalidation passed');
   if(process.env.BOMKIT_PRIVATE_TESTS==='1') {
     for(const [name,count,qty,t] of [
@@ -111,12 +130,15 @@ try {
       await reset();await start(path.join(inputs,name),path.join(inputs,'material.xlsx'),path.join(inputs,t),count,qty);
       assert.ok((await page.locator('main').innerText()).includes('物料库 17371 条可用'));
       await download('export-draft',name.replaceAll('.','-')+'-browser-draft.xlsx',count,qty);
-      await id('review-row-0').click();await modal.waitFor();
+      const autoPassed=Number((await id('automatic-summary').innerText()).match(/\d+/)[0]);
+      const pending=Number((await id('pending-summary').innerText()).match(/\d+/)[0]);
+      assert.equal(autoPassed+pending,count);
+      await page.locator('[data-testid^="review-row-"]').first().click();await modal.waitFor();
       assert.ok((await modal.innerText()).includes('BOM 原始信息'));assert.equal(await id('confirm-row').isDisabled(),true);
       await modal.getByRole('button',{name:'关闭',exact:true}).click();await modal.waitFor({state:'hidden'});
       assert.equal(await id('export-final').isDisabled(),true);
       assert.deepEqual(await page.locator('.ant-alert-error').allTextContents(),[]);
-      report.cases.push({name,passed:true,rows:count,quantity:qty,template:t,mode:'draft',businessConfirmation:false});
+      report.cases.push({name,passed:true,rows:count,quantity:qty,autoPassed,pending,template:t,mode:'draft',businessConfirmation:false});
       console.log(name,'real browser draft roundtrip passed',count,qty);
     }
   }
@@ -129,10 +151,12 @@ try {
   report.cases.push({name:'invalid-inputs',passed:true});
   const largeRows=[['Designator','Quantity','Name','Device','Footprint','Comment']];
   for(let i=1;i<=5000;i++) largeRows.push(['R'+i,'1','10kΩ','SYNTHETIC-MODEL-A','0603','']);
-  await start(fixture('synthetic-5000.xlsx',largeRows),materials,template,5000,5000);
+  await start(fixture('synthetic-5000.xlsx',largeRows),materials,template,5000,5000,0);
   await download('export-draft','synthetic-5000-draft.xlsx',5000,5000);
-  assert.equal(await id('export-final').isDisabled(),true);
-  report.cases.push({name:'large-5000-rows',passed:true,rows:5000,quantity:5000});
+  const largeFinal=await download('export-final','synthetic-5000-final.xlsx',5000,5000);
+  assert.ok(largeFinal.rows.every(r=>r[largeFinal.header.indexOf('校对状态')]===''));
+  assert.equal(await page.locator('[data-testid^="review-row-"]').count(),0);
+  report.cases.push({name:'large-5000-rows',passed:true,rows:5000,quantity:5000,autoPassed:5000,confirmationClicks:0});
   await page.screenshot({path:path.join(output,'synthetic-5000.png'),fullPage:true});
   // 页面布局检查，不把屏幕截图存在等同于人工视觉验收。
   const layout=await page.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth,

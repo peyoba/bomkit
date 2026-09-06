@@ -17,7 +17,7 @@ export function Home({ onStart }: { onStart: () => void }) {
           确认转换过程中没有发起任何文件上传请求来验证这一点。
         </Paragraph>
       </Card>
-      <Paragraph>原型号始终保留。所有行都需要明确确认；修改候选或最终值后必须重新确认。没有确认完成时仅能导出待校对稿。</Paragraph>
+      <Paragraph>原型号始终保留。确定项直接通过，只标出不确定项的原因与具体差异；处理完问题即可正式导出，不需要逐行点确认。</Paragraph>
       <Button type="primary" size="large" onClick={onStart}>
         开始转换
       </Button>

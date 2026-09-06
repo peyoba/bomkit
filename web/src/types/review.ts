@@ -5,19 +5,22 @@ export interface InputFormat { id: string; platform: string; name: string; heade
 export interface ReviewMaterial { id: string; source_row: number; code: string; name: string; spec: string; footprint: string; manufacturer: string; tolerance: string }
 export interface FinalFields { code: string; name: string; model: string; footprint: string }
 export interface Confirmation { reviewer: string; at: string; fingerprint: string }
+export interface ReviewFinding { code: string; field: string; label: string; original: string; library: string; final: string; reason: string }
 export interface ReviewItem {
   row_id: number; source_row: number; source: Record<string, string>;
   fields: { designator: string; qty: number; value: string; mpn: string; footprint: string; manufacturer: string; description: string; category: string; tolerance: string; source_code: string; dnp: boolean };
-  original_model: string; issues: string[]; candidates: ReviewMaterial[]; candidate_count: number;
+  original_model: string; issues: string[]; candidates: ReviewMaterial[]; candidate_count: number; qualified_count: number;
   match_level: string; match_label: string; selected_id: string | null; selected_material: ReviewMaterial | null;
   final: FinalFields; differences: string[]; note: string; confirmed: boolean; confirmation: Confirmation | null;
+  review_findings: ReviewFinding[]; requires_review: boolean; export_ready: boolean;
+  review_status: "auto_passed" | "needs_review" | "confirmed"; auto_pass_basis: string;
   history: Array<Confirmation & { selected_id: string | null; final: FinalFields; note: string }>;
 }
 export interface ReviewSnapshot {
   schema_version: 2; profile: InputFormat; source_name: string; sheet_name: string; items: ReviewItem[];
   material_stats: {total: number; enabled: number; disabled: number; missing_spec: number; duplicate_codes: number};
   skipped_rows: Array<{row: number; reason: string; text?: string}>;
-  stats: {rows: number; quantity: number; confirmed: number; pending: number};
+  stats: {rows: number; quantity: number; confirmed: number; auto_passed: number; pending: number};
 }
 export interface LoadedTable extends RowsPayload { file_name: string; sheet_names: string[]; encoding?: string }
 export type ReviewAction = "detect" | "start" | "clear" | "update" | "confirm" | "revoke" | "search" | "snapshot" | "export";

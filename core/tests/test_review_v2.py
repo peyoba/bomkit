@@ -23,6 +23,12 @@ def session(rows=None, materials=None):
     return ReviewSession(copy.deepcopy(rows or BOM), copy.deepcopy(materials or MATERIAL), source_name="synthetic.xlsx")
 
 
+def uncertain_session():
+    rows = copy.deepcopy(BOM)
+    rows[1][4] = "0805"
+    return session(rows)
+
+
 @pytest.mark.parametrize(
     "headers,row,platform",
     [
@@ -119,35 +125,38 @@ def test_material_blank_specs_duplicate_codes_and_disabled_are_distinct():
     assert s.search("禁用")["total"] == 0
 
 
-def test_exact_match_is_not_automatic_confirmation():
+def test_exact_match_passes_without_fabricating_manual_confirmation():
     s = session()
     assert s.items[0]["match_level"] == "exact"
     assert not s.items[0]["confirmed"]
-    with pytest.raises(ProfileError, match="未确认"):
-        s.assert_confirmed()
+    assert s.items[0]["review_status"] == "auto_passed"
+    assert s.items[0]["review_findings"] == []
+    s.assert_confirmed()
     confirmed = s.confirm(0, "测试员")
-    assert confirmed["confirmed"]
+    assert not confirmed["confirmed"] and confirmed["history"] == []
     s.assert_confirmed()
 
 
-def test_any_text_difference_is_preserved_and_flagged():
+def test_harmless_text_difference_is_preserved_without_flag():
     rows = copy.deepcopy(BOM)
     rows[1][3] = " r-10k-a "
     s = session(rows)
     assert s.items[0]["original_model"] == " r-10k-a "
     assert s.items[0]["selected_material"]["spec"] == "R-10K-A"
-    assert any("原文不同" in x for x in s.items[0]["differences"])
+    assert s.items[0]["differences"] == []
+    assert s.items[0]["export_ready"]
 
 
 def test_separate_value_and_manual_name_changes_cannot_hide_difference():
     s = session()
-    assert any("另有原始元件值" in x for x in s.items[0]["differences"])
+    assert s.items[0]["differences"] == []
     item = s.update(0, {"final": {"name": "人工改名"}})
-    assert any("最终值经过手动校对" in x for x in item["differences"])
+    assert any(p["field"] == "name" and p["final"] == "人工改名" for p in item["review_findings"])
+    assert not item["export_ready"]
 
 
 def test_change_after_confirm_invalidates_and_records_history():
-    s = session()
+    s = uncertain_session()
     s.confirm(0, "首次校对")
     changed = s.update(0, {"final": {"model": "校对新型号"}})
     assert not changed["confirmed"] and len(changed["history"]) == 1
@@ -181,10 +190,13 @@ def test_unmatched_needs_explicit_note_and_keeps_source_model():
 
 
 def test_invalid_patch_atomic_and_confirmation_cannot_be_spoofed():
-    s = session()
+    s = uncertain_session()
     before = copy.deepcopy(s.items[0])
     for patch in (
         {"confirmed": True},
+        {"export_ready": True},
+        {"review_status": "auto_passed"},
+        {"review_findings": []},
         {"selected_id": "invalid"},
         {"selected_id": {}},
         {"note": None},
@@ -273,7 +285,7 @@ def test_template_roundtrip_rows_style_and_old_content_cleaned(kind):
     assert ws.cell(header, 1).font.bold
     strings = [str(c.value) for sh in w for row in sh for c in row if c.value is not None]
     assert not any("旧明细" in v or "旧页脚" in v or "旧项目" in v for v in strings)
-    assert any("待校对" in v for v in strings)
+    assert "待校对稿" in ws.oddHeader.center.text
     if kind != "simple":
         assert ws.cell(header + 1, 3).value == 1
         assert ws.cell(header + 1, 4).value == "R1"
@@ -285,7 +297,7 @@ def test_template_roundtrip_rows_style_and_old_content_cleaned(kind):
 
 
 def test_final_export_gate_changes_and_formula_safety():
-    s = session()
+    s = uncertain_session()
     with pytest.raises(ProfileError):
         export_review(s, mode="final")
     s.update(0, {"final": {"model": '=HYPERLINK("bad")', "code": "+001"}, "note": "=说明"})
@@ -308,7 +320,9 @@ def test_bad_template_never_silently_uses_default(bad):
 
 
 def test_dispatch_has_no_client_supplied_final_rows_bypass():
-    dispatch("start", {"bom_rows": BOM, "material_rows": MATERIAL})
+    rows = copy.deepcopy(BOM)
+    rows[1][4] = "0805"
+    dispatch("start", {"bom_rows": rows, "material_rows": MATERIAL})
     with pytest.raises(ProfileError):
         dispatch("export", {"mode": "final", "items": [{"confirmed": True}]})
     dispatch("clear", {})

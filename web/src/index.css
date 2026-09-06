@@ -4,6 +4,11 @@ body { margin: 0; }
 * { box-sizing: border-box; }
 .workspace { max-width: 1480px; margin: 24px auto; padding: 0 24px 40px; }
 .review-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.review-findings { margin: 0; padding-left: 18px; overflow-wrap: anywhere; }
+.review-findings li + li { margin-top: 12px; }
+.review-findings strong { font-weight: 500; }
+.review-findings span { color: #666; }
+.review-findings code { white-space: pre-wrap; }
 .file-input { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
 input[type="file"] { display: block; max-width: 100%; margin-top: 8px; padding: 12px; border: 1px dashed #91a8c2; border-radius: 6px; background: #fafcff; }
 .field-label { display: block; margin-bottom: 12px; }

@@ -159,6 +159,7 @@ def import_bom(rows: list[list[str]], platform: str = "auto") -> tuple[dict, lis
     mapping = profile["column_map"]
     items, skipped = [], []
     seen_refs: dict[str, int] = {}
+    seen_items: dict[str, int] = {}
     for index, raw in enumerate(rows[header_index + 1 :], header_index + 1):
         if not any(v.strip() for v in raw):
             skipped.append({"row": index + 1, "reason": "空行"})
@@ -215,10 +216,15 @@ def import_bom(rows: list[list[str]], platform: str = "auto") -> tuple[dict, lis
         elif len(refs) != qty:
             issues.append("数量与可识别位号数不一致，请核对")
         for ref in refs:
-            if ref in seen_refs:
-                issues.append(f"位号重复（首次出现在第 {seen_refs[ref]} 行）")
+            ref_key = ref.upper()
+            if ref_key in seen_refs:
+                issues.append(f"位号重复（{ref}，首次出现在第 {seen_refs[ref_key]} 行）")
+                previous = seen_items[ref_key]
+                if previous < len(items):
+                    items[previous]["issues"].append(f"位号重复（{ref} 也出现在第 {index + 1} 行）")
             else:
-                seen_refs[ref] = index + 1
+                seen_refs[ref_key] = index + 1
+                seen_items[ref_key] = len(items)
         if fields["dnp"]:
             issues.append("原文标记 DNP，不自动删除或改数量")
         items.append(

@@ -3,6 +3,7 @@ import { Alert, Button, Card, Checkbox, Descriptions, Input, InputNumber, Modal,
 import { getWorkerClient } from "../workers/singleton";
 import { useWorkerStore } from "../stores/workerStore";
 import { detectReviewInput, fileBase64, loadTable } from "../lib/reviewInput";
+import { ReviewFindings } from "../components/ReviewFindings";
 import type { FinalFields, LoadedTable, Platform, ReviewItem, ReviewMaterial, ReviewSnapshot } from "../types/review";
 
 const { Title, Paragraph, Text } = Typography;
@@ -43,6 +44,8 @@ function RowEditor({item, reviewer, onReviewer, onUpdate, onClose}: {item: Revie
   const worker = getWorkerClient();
   const choices = [...new Map([...current.candidates, ...found, ...(current.selected_material ? [current.selected_material] : [])].map(m => [m.id, m])).values()];
   const selected = current.selected_material;
+  const valuesDirty = (Object.keys(final) as Array<keyof FinalFields>).some(key => final[key] !== current.final[key]);
+  const needsReview = current.requires_review;
   const accept = (updated: ReviewItem) => {setCurrent(updated); setFinal({...updated.final}); setNote(updated.note); setChecked(false); onUpdate(updated);};
   async function select(id: string | null) {
     setBusy(true); setError(null);
@@ -59,22 +62,22 @@ function RowEditor({item, reviewer, onReviewer, onUpdate, onClose}: {item: Revie
     try {
       const updated = await worker.review<ReviewItem>("update", {row_id: item.row_id, patch: {final, note}});
       onUpdate(updated); setCurrent(updated);
-      if (confirm) {
+      if (confirm && updated.requires_review) {
         const confirmed = await worker.review<ReviewItem>("confirm", {row_id: item.row_id, reviewer});
         onUpdate(confirmed); message.success("此行已人工确认"); onClose();
-      } else { accept(updated); message.success("已保存，需重新确认"); }
+      } else { accept(updated); message.success(updated.export_ready ? "已保存，无需人工确认" : "已重新检查，请处理列出的问题"); }
     } catch (e) {setChecked(false); setError(errorText(e));} finally {setBusy(false);}
   }
   const finalLabels: Array<[keyof FinalFields, string]> = [["code", "最终物料编码"], ["name", "最终名称"], ["model", "最终型号 / 规格"], ["footprint", "最终封装"]];
-  return <Modal title={`校对 ${item.fields.designator || `源行 ${item.source_row}`}`} open width={1050}
+  return <Modal title={`${needsReview ? "处理" : "查看"} ${item.fields.designator || `源行 ${item.source_row}`}`} open width={1050}
     onCancel={busy ? undefined : onClose} maskClosable={false} closable={!busy} keyboard={!busy}
-    footer={<Space><Button onClick={onClose} disabled={busy}>关闭</Button><Button onClick={() => void save(false)} disabled={busy}>保存修改（不确认）</Button>
-      <Button type="primary" data-testid="confirm-row" onClick={() => void save(true)} loading={busy} disabled={!checked || !reviewer.trim()}>确认此行</Button></Space>}>
+    footer={<Space><Button onClick={onClose} disabled={busy}>关闭</Button><Button onClick={() => void save(false)} disabled={busy || (!valuesDirty && note === current.note)}>保存并重新检查</Button>
+      {needsReview && <Button type="primary" data-testid="confirm-row" onClick={() => void save(true)} loading={busy} disabled={valuesDirty || !checked || !reviewer.trim()}>确认此项问题已核实</Button>}</Space>}>
     {error && <Alert type="error" showIcon title={error} style={{marginBottom: 12}} />}
     <div className="review-columns">
       <Card size="small" title="BOM 原始信息（只读）">
         <Descriptions size="small" column={1} items={[
-          {key: "model", label: "原型号", children: <Text code mark={!!selected && selected.spec !== item.original_model}>{item.original_model || "（空）"}</Text>},
+          {key: "model", label: "原型号", children: <Text code>{item.original_model || "（空）"}</Text>},
           {key: "value", label: "原元件值", children: item.fields.value || "（空）"},
           {key: "footprint", label: "原封装", children: item.fields.footprint || "（空）"},
           {key: "ref", label: "位号 / 数量", children: `${item.fields.designator} / ${item.fields.qty}`},
@@ -83,7 +86,7 @@ function RowEditor({item, reviewer, onReviewer, onUpdate, onClose}: {item: Revie
         ]} />
         <details><summary>查看所有源字段与备注</summary><dl className="source-fields">{Object.entries(item.source).map(([k,v]) => <div key={k}><dt>{k}</dt><dd>{v || "（空）"}</dd></div>)}</dl></details>
       </Card>
-      <Card size="small" title="系统库候选（不等于已确认）">
+      <Card size="small" title="系统库记录">
         <Input.Search aria-label="搜索物料库" placeholder="编码、型号或关键词；空格分隔" value={query} onChange={e => setQuery(e.target.value)} onSearch={() => void search()} loading={busy} />
         {query && <Text type="secondary">搜索到 {totalFound} 条（显示前 30 条）</Text>}
         <Select aria-label="物料候选" style={{width: "100%", margin: "12px 0"}} value={current.selected_id ?? ""} disabled={busy}
@@ -91,22 +94,24 @@ function RowEditor({item, reviewer, onReviewer, onUpdate, onClose}: {item: Revie
         <Descriptions size="small" column={1} items={[
           {key: "code", label: "库编码", children: selected?.code || "（未关联）"},
           {key: "name", label: "库名称", children: selected?.name || "（空）"},
-          {key: "spec", label: "库规格原文", children: <Text code mark={!!selected && selected.spec !== item.original_model}>{selected?.spec || "（空）"}</Text>},
+          {key: "spec", label: "库规格原文", children: <Text code>{selected?.spec || "（空）"}</Text>},
         ]} />
-        <Text type="secondary">{current.candidate_count} 条自动候选；更多记录可搜索。改变候选会撤销之前的确认。</Text>
+        <Text type="secondary">{current.candidate_count} 条搜索候选，{current.qualified_count} 条符合已知条件。改变候选后重新判断。</Text>
       </Card>
     </div>
-    <Alert type="warning" showIcon title="差异与核对提示" description={<ul>{current.differences.length ? current.differences.map(d => <li key={d}>{d}</li>) : <li>原型号文本一致，仍请核对编码、参数与实际用途。</li>}</ul>} style={{margin: "16px 0"}} />
+    {current.review_findings.length > 0 && <Alert type={current.confirmed ? "info" : "warning"} showIcon title={current.confirmed ? "已核实的问题记录" : "仅以下问题需要人工确认"}
+      description={<ReviewFindings findings={current.review_findings} />} style={{margin: "16px 0"}} />}
+    {valuesDirty && <Paragraph type="secondary">请先保存修改，系统将重新判断是否仍有需要确认的问题。</Paragraph>}
     <div className="review-columns">
       <Card size="small" title="最终输出值（可修改，原始信息不会丢失）">{finalLabels.map(([key,label]) => <label className="field-label" key={key}>{label}
         <Input aria-label={label} value={final[key]} disabled={busy} onChange={e => {setFinal({...final, [key]: e.target.value}); setChecked(false);}} /></label>)}
       </Card>
-      <Card size="small" title="确认">
+      {needsReview && <Card size="small" title="确认问题">
         <label className="field-label">校对人<Input aria-label="校对人" value={reviewer} maxLength={100} disabled={busy} onChange={e => {onReviewer(e.target.value); setChecked(false);}} /></label>
         <label className="field-label">校对 / 保留原因（缺失信息或不关联库时必填）<Input.TextArea aria-label="校对说明" value={note} maxLength={2000} rows={3} disabled={busy} onChange={e => {setNote(e.target.value); setChecked(false);}} /></label>
-        <Checkbox checked={checked} disabled={busy} onChange={e => setChecked(e.target.checked)}>我已核对本行全部原始属性、库规格、最终值及所有提示，确认本次输出。</Checkbox>
+        <Checkbox checked={checked} disabled={busy || valuesDirty} onChange={e => setChecked(e.target.checked)}>我已核实上面列出的问题及最终输出。</Checkbox>
         {current.confirmation && <Paragraph type="secondary">上次确认：{current.confirmation.reviewer} · {current.confirmation.at}</Paragraph>}
-      </Card>
+      </Card>}
     </div>
   </Modal>;
 }
@@ -126,19 +131,20 @@ export function ReviewWorkspace() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
-  const [pendingOnly, setPendingOnly] = useState(false);
+  const [pendingOnly, setPendingOnly] = useState(true);
   const [search, setSearch] = useState("");
   const engine = useWorkerStore();
   useEffect(() => {getWorkerClient();}, []);
   const format = useMemo(() => {if (!bom) return null; try {return detectReviewInput(bom.rows, platform);} catch {return null;}}, [bom,platform]);
   const ready = engine.mode === "pyodide" && engine.status === "ready";
   const confirmed = snapshot?.items.filter(i => i.confirmed).length ?? 0;
-  const pending = (snapshot?.items.length ?? 0) - confirmed;
+  const automatic = snapshot?.items.filter(i => i.review_status === "auto_passed").length ?? 0;
+  const pending = snapshot?.items.filter(i => !i.export_ready).length ?? 0;
   function updateItem(item: ReviewItem) {setSnapshot(prev => prev ? {...prev, items: prev.items.map(i => i.row_id === item.row_id ? item : i)} : prev);}
   async function start() {
     if (!bom || !format) return;
     setBusy(true); setError(null);
-    try { const result = await getWorkerClient().review<ReviewSnapshot>("start", {bom_rows: bom.rows, material_rows: material?.rows ?? null, platform, source_name: bom.file_name, sheet_name: bom.sheet_name}); setSnapshot(result); }
+    try { const result = await getWorkerClient().review<ReviewSnapshot>("start", {bom_rows: bom.rows, material_rows: material?.rows ?? null, platform, source_name: bom.file_name, sheet_name: bom.sheet_name}); setSnapshot(result); setPendingOnly(true); setSearch(""); }
     catch (e) {setError(errorText(e));} finally {setBusy(false);}
   }
   async function reset() {
@@ -152,15 +158,15 @@ export function ReviewWorkspace() {
     try {
       const data = await getWorkerClient().review<Uint8Array>("export", {mode, template_b64: template?.b64 ?? null, meta: {title: title || snapshot.source_name.replace(/\.[^.]+$/, ""), batch_size: batch}});
       const bytes = new Uint8Array(data); const url = URL.createObjectURL(new Blob([bytes], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
-      const a = document.createElement("a"); a.href = url; a.download = `BOM_${snapshot.source_name.replace(/\.[^.]+$/, "")}_${mode === "draft" ? "待校对" : "已确认"}.xlsx`;
+      const a = document.createElement("a"); a.href = url; a.download = `BOM_${snapshot.source_name.replace(/\.[^.]+$/, "")}_${mode === "draft" ? "待校对" : "正式"}.xlsx`;
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
-      message.success(mode === "draft" ? "已导出待校对稿（不可投产）" : "已导出确认结果与校对记录");
+      message.success(mode === "draft" ? "已导出待校对稿（不可投产）" : "已导出正式结果与问题处理记录");
     } catch(e) {setError(errorText(e));} finally {setBusy(false);}
   }
-  const rows = snapshot?.items.filter(i => (!pendingOnly || !i.confirmed) && (!search || `${i.fields.designator} ${i.original_model} ${i.final.model} ${i.final.code}`.toLowerCase().includes(search.toLowerCase()))) ?? [];
+  const rows = snapshot?.items.filter(i => (!pendingOnly || !i.export_ready) && (!search || `${i.fields.designator} ${i.original_model} ${i.final.model} ${i.final.code}`.toLowerCase().includes(search.toLowerCase()))) ?? [];
   return <main className="workspace">
     <Title level={2}>BOM 校对工作台</Title>
-    <Paragraph type="secondary">本地处理 · 原文留存 · 系统推荐不是人工确认 · 不自动合并不同属性的行</Paragraph>
+    <Paragraph type="secondary">确定项直接通过，只处理不确定项 · 本地处理 · 原文留存 · 不自动合并不同属性的行</Paragraph>
     {!ready && <Alert type={engine.status === "error" || engine.mode === "mock" ? "error" : "info"} showIcon
       title={engine.mode === "mock" ? "校对闭环不支持 mock，请移除网址中的 worker=mock" : engine.errorMessage || "正在加载本地 Python 引擎…"}
       description={engine.status !== "error" ? <Progress percent={engine.progress} /> : "请确认已准备 Pyodide 资源，再刷新页面。"} />}
@@ -180,7 +186,7 @@ export function ReviewWorkspace() {
         </Card>
       </div>
     </> : <Card size="small" title={`${snapshot.profile.name} · ${snapshot.source_name}`} extra={<Button onClick={() => void reset()} disabled={busy || editing !== null}>重新导入（清空确认）</Button>}>
-      <Space wrap size="large"><Text strong data-testid="row-summary">{snapshot.items.length} 行 / 数量合计 {snapshot.stats.quantity}</Text><Text>已确认 {confirmed}</Text><Text type="warning" data-testid="pending-summary">待校对 {pending}</Text><Text>物料库 {snapshot.material_stats.enabled} 条可用 / {snapshot.material_stats.disabled} 条禁用</Text></Space>
+      <Space wrap size="large"><Text strong data-testid="row-summary">{snapshot.items.length} 行 / 数量合计 {snapshot.stats.quantity}</Text><Text data-testid="automatic-summary">无需人工确认 {automatic}</Text><Text>已处理 {confirmed}</Text><Text type={pending ? "warning" : "secondary"} data-testid="pending-summary">需确认 {pending}</Text><Text>物料库 {snapshot.material_stats.enabled} 条可用 / {snapshot.material_stats.disabled} 条禁用</Text></Space>
       {snapshot.material_stats.missing_spec > 0 && <Paragraph type="secondary">物料库 {snapshot.material_stats.missing_spec} 条无规格，已保留供编码搜索。</Paragraph>}
       {snapshot.skipped_rows.some(r => r.text) && <Alert type="warning" title="原表含表尾备注，请核对（不作为软件指令执行）" description={snapshot.skipped_rows.filter(r => r.text).map(r => <p key={r.row}>第 {r.row} 行：{r.text}</p>)} />}
     </Card>}
@@ -195,23 +201,24 @@ export function ReviewWorkspace() {
       </div>
       <Text type="secondary">{template ? `已选择：${template.name}` : "未上传时使用默认 7 列格式"}。旧明细将清空，保留列布局和样式；附原始输入与校对记录，批量列按本次套数计算。</Text>
     </Card>
-    {!snapshot && <Button type="primary" size="large" data-testid="start-review" loading={busy} disabled={!bom || !format || !ready || templateBusy || bomReading || materialReading} onClick={() => void start()}>读取并开始校对</Button>}
+    {!snapshot && <Button type="primary" size="large" data-testid="start-review" loading={busy} disabled={!bom || !format || !ready || templateBusy || bomReading || materialReading} onClick={() => void start()}>检查 BOM</Button>}
     {snapshot && <>
       <Space wrap style={{marginBottom: 16}}>
         <Input.Search aria-label="筛选校对行" placeholder="搜索位号 / 型号 / 编码" value={search} onChange={e => setSearch(e.target.value)} allowClear />
-        <Checkbox checked={pendingOnly} onChange={e => setPendingOnly(e.target.checked)}>只看未确认</Checkbox>
+        <Checkbox checked={pendingOnly} onChange={e => setPendingOnly(e.target.checked)}>只看需确认项</Checkbox>
         <Button data-testid="export-draft" loading={busy} disabled={editing !== null || templateBusy} onClick={() => void download("draft")}>导出待校对稿</Button>
         <Button data-testid="export-final" type="primary" disabled={pending > 0 || busy || editing !== null || templateBusy} onClick={() => void download("final")}>导出正式结果</Button>
       </Space>
-      <Table<ReviewItem> dataSource={rows} rowKey="row_id" size="small" scroll={{x: 1180}} pagination={{pageSize: 15, showSizeChanger: false}} columns={[
-        {title: "源行 / 位号", width: 150, render: (_,i) => <><Text type="secondary">第 {i.source_row} 行</Text><div>{i.fields.designator}</div></>},
-        {title: "数量", dataIndex: ["fields","qty"], width: 65},
-        {title: "BOM 原型号", dataIndex: "original_model", width: 200},
-        {title: "原封装", dataIndex: ["fields","footprint"], width: 130},
-        {title: "库型号 / 最终型号", width: 250, render: (_,i) => <><div>{i.selected_material?.spec || "未选库记录"}</div><Text type="secondary">最终：{i.final.model}</Text></>},
-        {title: "最终编码", dataIndex: ["final","code"], width: 170},
-        {title: "状态", width: 150, render: (_,i) => <><Tag color={i.confirmed ? "green" : "orange"}>{i.confirmed ? "已人工确认" : "待校对"}</Tag><div>{i.differences.length} 项提示</div></>},
-        {title: "操作", width: 100, fixed: "right", render: (_,i) => <Button data-testid={`review-row-${i.row_id}`} disabled={busy} onClick={() => setEditing(i.row_id)}>校对</Button>},
+      <Table<ReviewItem> dataSource={rows} rowKey="row_id" size="small" scroll={{x: 1320}} pagination={{pageSize: 15, showSizeChanger: false}}
+        locale={{emptyText: pendingOnly && pending === 0 ? "没有需要人工确认的项，可直接导出正式结果。" : "没有符合筛选条件的项"}} columns={[
+        {title: "源行 / 位号", width: 130, render: (_,i) => <><Text type="secondary">第 {i.source_row} 行</Text><div>{i.fields.designator}</div></>},
+        {title: "数量", dataIndex: ["fields","qty"], width: 55},
+        {title: "BOM 原型号", dataIndex: "original_model", width: 180},
+        {title: "原封装", dataIndex: ["fields","footprint"], width: 95},
+        {title: "库型号 / 最终型号", width: 210, render: (_,i) => <><div>{i.selected_material?.spec || "未选库记录"}</div><Text type="secondary">最终：{i.final.model}</Text></>},
+        {title: "最终编码", dataIndex: ["final","code"], width: 140},
+        {title: "需要确认的原因与差异", width: 410, render: (_,i) => <>{i.confirmed && <Tag color="green">已处理</Tag>}<ReviewFindings findings={i.review_findings} /></>},
+        {title: "操作", width: 100, fixed: "right", render: (_,i) => <Button data-testid={`review-row-${i.row_id}`} disabled={busy} onClick={() => setEditing(i.row_id)}>{i.export_ready ? "查看" : "处理"}</Button>},
       ]} />
       {editing !== null && snapshot.items[editing] && <RowEditor key={editing} item={snapshot.items[editing]} reviewer={reviewer} onReviewer={setReviewer} onUpdate={updateItem} onClose={() => setEditing(null)} />}
     </>}

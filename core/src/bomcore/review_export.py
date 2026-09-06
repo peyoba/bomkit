@@ -116,6 +116,8 @@ def _audit_sheet(wb, session):
         "确认时间",
         "校对说明",
         "确认历史",
+        "自动判定依据",
+        "问题明细",
     ]
     for c, h in enumerate(headers, 1):
         safe_cell(ws, 1, c, h).font = Font(bold=True)
@@ -141,16 +143,21 @@ def _audit_sheet(wb, session):
             final["model"],
             final["footprint"],
             "；".join(item["differences"]),
-            "已人工确认" if item["confirmed"] else "待校对",
+            "已人工确认" if item["confirmed"] else ("自动通过（无需人工确认）" if item["export_ready"] else "待校对"),
             confirm.get("reviewer", ""),
             confirm.get("at", ""),
             item["note"],
             json.dumps(item["history"], ensure_ascii=False),
+            item["auto_pass_basis"],
+            json.dumps(item["review_findings"], ensure_ascii=False),
         ]
         for c, v in enumerate(vals, 1):
             cell = safe_cell(ws, nr, c, v)
             cell.alignment = Alignment(vertical="top", wrap_text=True)
-            cell.fill = GREEN if item["confirmed"] else AMBER
+            if item["confirmed"]:
+                cell.fill = GREEN
+            elif not item["export_ready"]:
+                cell.fill = AMBER
     ws.freeze_panes = "D2"
     ws.auto_filter.ref = ws.dimensions
     raw = wb.create_sheet("原始输入")
@@ -203,13 +210,13 @@ def export_review(session, template_b64: str | None = None, meta: dict | None = 
             if cell.row < header or cell.column not in mapping or cell.data_type == "f":
                 cell.value = None
     name = str(meta.get("title") or Path(session.source_name or "BOM").stem)
-    status = "待校对稿 · 不可用于投产" if mode == "draft" else "已人工确认"
+    status = "待校对稿 · 不可用于投产" if mode == "draft" else "正式结果"
     title = f"{name} — {status}"
     if header > 1:
         cell = safe_cell(ws, 1, 1, title)
         cell.font = Font(name="Microsoft YaHei", size=14, bold=True)
         ws.row_dimensions[1].height = max(ws.row_dimensions[1].height or 20, 26)
-    ws.title = "待校对BOM" if mode == "draft" else "已确认BOM"
+    ws.title = "待校对BOM" if mode == "draft" else "BOM"
     # 模板只有表头（无标题行）时加一个状态列，不改其既有列顺序。
     status_col = original_max_col + 1
     safe_cell(ws, header, status_col, "校对状态").font = Font(bold=True)
@@ -235,9 +242,13 @@ def export_review(session, template_b64: str | None = None, meta: dict | None = 
             cell.alignment = Alignment(vertical="center", wrap_text=True)
             if not cell.border.bottom.style:
                 cell.border = border
-        state = "已人工确认" if item["confirmed"] else "待校对（不可投产）"
-        safe_cell(ws, r, status_col, state).fill = GREEN if item["confirmed"] else AMBER
-        if not item["confirmed"]:
+        state = "已人工确认" if item["confirmed"] else ("" if item["export_ready"] else "待校对（不可投产）")
+        status_cell = safe_cell(ws, r, status_col, state)
+        if item["confirmed"]:
+            status_cell.fill = GREEN
+        elif not item["export_ready"]:
+            status_cell.fill = AMBER
+        if not item["export_ready"]:
             for c, field in mapping.items():
                 if field in ("model", "code", "footprint"):
                     ws.cell(r, c).fill = AMBER
