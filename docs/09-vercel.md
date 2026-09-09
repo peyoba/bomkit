@@ -22,4 +22,10 @@ vercel.json指定npm --prefix web ci --include=dev安装，随后bash scripts/ve
 
 每次推送生产分支由原生GitHub连接触发构建。发布成功需同时核对：Vercel状态READY、Git提交SHA/分支正确、线上首页/manifest/WASM返回正常，以及仅合成数据的浏览器转换和下载。不得把BUILDING或仅Git推送成功报为上线完成。
 
-首次公网发布地址及验收以本任务最终结果为准。个人项目用途改变时需自行重新核对套餐使用规则。
+## 已验证的公开地址
+
+[bomkit.vercel.app](https://bomkit.vercel.app)
+
+2026-09-09，GitHub提交036fb611经原生Git连接自动部署成功，Vercel状态READY，GitHub Vercel检查success。公网Excel模式15组合成场景及可选网页模式3组全部通过，含5000行、Excel下载回读、坏输入、原公司样式流程；外部请求/上传记录均0。首页和WASM返回200，WASM MIME正确，引擎manifest响应no-store。没有使用真实公司样例进行公网测试。
+
+后续推送相同生产分支会继续自动部署；本次地址说明更新不改变应用代码。个人项目用途改变时需自行重新核对套餐使用规则。

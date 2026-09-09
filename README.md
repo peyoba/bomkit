@@ -86,6 +86,8 @@ E2E默认访问本机preview 4173，使用真正Pyodide；可用BOMKIT_E2E_URL�
 
 ## GitHub → Vercel
 
+在线使用：[bomkit.vercel.app](https://bomkit.vercel.app)。
+
 仓库：<https://github.com/peyoba/bomkit>。Vercel项目bomkit位于个人空间peyobas-projects，生产分支为codex/excel-first-compat；没有覆盖远端main。
 
 构建从仓库根目录运行：npm在web安装完整构建依赖，scripts/vercel-build.sh选择Python≥3.10、安装固定打包工具、重新构建bomcore wheel、准备自托管Pyodide并构建网页。只发布web/dist，不部署Python函数、不使用数据库，也不需要上传BOM资料。
