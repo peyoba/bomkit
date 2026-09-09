@@ -2,34 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Checkbox, Descriptions, Input, InputNumber, Modal, Progress, Select, Space, Table, Tag, Typography, message } from "antd";
 import { getWorkerClient } from "../workers/singleton";
 import { useWorkerStore } from "../stores/workerStore";
-import { detectReviewInput, fileBase64, loadTable } from "../lib/reviewInput";
+import { detectReviewInput, fileBase64 } from "../lib/reviewInput";
+import { LocalTableInput } from "../components/LocalTableInput";
 import { ReviewFindings } from "../components/ReviewFindings";
 import type { FinalFields, LoadedTable, Platform, ReviewItem, ReviewMaterial, ReviewSnapshot } from "../types/review";
 
 const { Title, Paragraph, Text } = Typography;
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
-
-function FileInput({ label, id, value, onChange, onLoading, disabled }: {label: string; id: string; value: LoadedTable | null; onChange: (v: LoadedTable | null) => void; onLoading: (v: boolean) => void; disabled: boolean}) {
-  const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
-  const read = async (f: File, sheet?: string) => {
-    setLoading(true); onLoading(true); onChange(null);
-    try { onChange(await loadTable(f, sheet)); } catch (e) { message.error(errorText(e)); }
-    finally { setLoading(false); onLoading(false); }
-  };
-  return <div className="file-input">
-    <label htmlFor={id}><strong>{label}</strong></label>
-    <input id={id} data-testid={id} type="file" accept=".xlsx,.txt,.tsv,.csv" disabled={disabled || loading}
-      onChange={e => { const selected = e.target.files?.[0]; if (selected) { setFile(selected); void read(selected); } else { setFile(null); onChange(null); } }} />
-    {loading && <Text>正在读取本地文件…</Text>}
-    {value && <Space wrap>
-      <Text type="secondary">{value.file_name} · {value.rows.length} 行（含表头）{value.encoding ? ` · ${value.encoding}` : ""}</Text>
-      {value.sheet_names.length > 1 && <Select aria-label={`${label}工作表`} value={value.sheet_name} disabled={disabled || loading}
-        options={value.sheet_names.map(name => ({label: name, value: name}))}
-        onChange={sheet => { if (file) void read(file, sheet); }} />}
-    </Space>}
-  </div>;
-}
 
 function RowEditor({item, reviewer, onReviewer, onUpdate, onClose}: {item: ReviewItem; reviewer: string; onReviewer: (v: string) => void; onUpdate: (v: ReviewItem) => void; onClose: () => void}) {
   const [current, setCurrent] = useState(item);
@@ -176,12 +155,12 @@ export function ReviewWorkspace() {
         <Card title="1. 选择 BOM">
           <Select aria-label="EDA 平台" value={platform} disabled={busy} style={{width: "100%", marginBottom: 12}} onChange={setPlatform}
             options={[{value: "auto", label: "自动识别已支持格式"}, {value: "jlc", label: "嘉立创 EDA"}, {value: "altium", label: "Altium Designer"}, {value: "cadence", label: "Cadence（明细 / 汇总）"}]} />
-          <FileInput label="BOM 文件" id="bom-file" value={bom} onChange={setBom} onLoading={setBomReading} disabled={busy} />
+          <LocalTableInput label="BOM 文件" id="bom-file" value={bom} onChange={setBom} onLoading={setBomReading} disabled={busy} />
           {format && <Alert type="success" title={`识别为 ${format.name}，表头第 ${format.header_row_index + 1} 行`} />}
           {bom && !format && <Alert type="warning" title="未识别到已支持格式，请检查所选平台或工作表" />}
         </Card>
         <Card title="2. 选择企业物料库">
-          <FileInput label="物料库文件（可选）" id="material-file" value={material} onChange={setMaterial} onLoading={setMaterialReading} disabled={busy} />
+          <LocalTableInput label="物料库文件（可选）" id="material-file" value={material} onChange={setMaterial} onLoading={setMaterialReading} disabled={busy} />
           <Paragraph type="secondary">识别“编码、名称、规格型号、禁用状态”。不提供物料库时可校对保留原文；不会生成猜测编码。</Paragraph>
         </Card>
       </div>

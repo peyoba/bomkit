@@ -52,7 +52,7 @@ def number(value: Decimal) -> str:
 
 VALUE = re.compile(
     r"^\s*(\d+(?:\.\d+)?)\s*"
-    r"([pPnNuUμµ][fF]|[mkKM]?(?:Ω|ω|[oO][hH][mM])|[rRkKMm])"
+    r"([pPnNuUμµ][fF]|[mkKM]?(?:Ω|ω|[oO][hH][mM]|欧(?:姆)?)|[rRkKMm])"
     r"(?![A-Za-z0-9.])"
 )
 COMPACT = re.compile(r"^\s*(\d+)([rRkKMm])(\d+)(?![A-Za-z0-9.])")
@@ -273,6 +273,18 @@ def candidate_findings(item: dict, material: dict, evidence: dict, jlc: bool = F
             )
         )
 
+    source_packages = [packages(value) for value in (original, f["value"], f["footprint"])]
+    if len(set().union(*source_packages)) > 1:
+        out.append(
+            finding(
+                "source_package_conflict",
+                "footprint",
+                "原始封装信息",
+                f"型号：{original}；元件值：{f['value']}；封装：{f['footprint']}",
+                spec,
+                "BOM 型号、元件值和封装列中的封装互相矛盾，请核实原始要求",
+            )
+        )
     bom_package = packages(f["footprint"])
     column_package = packages(material["footprint"])
     library_package = column_package or evidence["packages"]

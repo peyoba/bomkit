@@ -1,21 +1,32 @@
-# bomkit — BOM 校对与标准化导出
+# bomkit — BOM 转换与 Excel 校对
 
-将嘉立创 EDA、Altium Designer、Cadence 的已验证导出格式导入本机，对照企业物料库。确定项直接通过，只标出不确定项及具体原因，处理后按已有 Excel 模板输出。
+**以原公司工具为兼容基线：按旧规则合并、排序、展开候选，下载后在 Excel 中处理。网页校对只是可选增强，不再是默认导出的门槛。**
 
-## 已实现
+## 两种入口
 
-- Excel、TXT/TSV/CSV 输入，自动识别三平台的已知模板和前置报表标题；Cadence 逐件与汇总形式均保留源行，不擅自合并。
-- 物料库查码与型号/参数候选，排除禁用物料，保留前导零；没有匹配时允许人工搜索或明确保留原文。
-- 唯一完整型号或精确参数可确定且无冲突的项自动通过，不标注、不要求点击。默认只列问题项，逐字段显示原因、BOM 原值、库值和人工改动。
-- 正式导出只拦截未处理的问题；修改后重新判断，无实际变化的保存不会撤销确认。自动通过与人工确认分开留痕，不伪造校对人。
-- 上传用户已有中文 BOM 模板，保留列布局与样式，清除旧明细和页脚；输出含校对记录与原始输入两张附表。
-- 浏览器本地 Pyodide Worker，无后端文件上传。模板和文件不自动保存到云端。
+| 入口 | 用途 | 是否要求网页确认 |
+|---|---|---|
+| 开始转换（默认） | 公司原版PCBA主表，候选展开、原标色、Excel内校对 | 不需要，未匹配/多候选也可下载 |
+| 网页校对（可选） | 保留已有逐项核对、自定义中文模板、校对历史 | 该模式内部保留自己的确认规则 |
+
+默认入口保留PCBA名称/型号、PCB空板名称/型号及自动空板行，主表含厂商、JLC规格、Description和匹配状态。原公司工具仓库只读，未修改。
+
+## 默认流程
+
+1. 选择BOM与可选物料表；可切换工作表。嘉立创Device列可选；支持已验证的Altium、Cadence及TXT变体。
+2. 可选填写PCBA/PCB信息、输出文件名。物料表支持金蝶完整格式，以及“规格、物料编码、金蝶系统型号”的旧简易格式。
+3. 点击“生成 Excel，在表格中校对”，直接下载，没有网页逐项确认步骤。
+4. 在Excel保留正确候选并删除多余候选，补充未匹配项，核对数量，再按公司流程审核。
+
+分组键仍为Name/值 + Footprint/封装 + DNP，数量求和、位号自然排序，其余字段取首个非空；按旧类别顺序及DNP沉底。不会因为新增网页规则而擅自取消合并或只输出默认推荐候选。
+
+**候选展开数量不是采购数量。** 同一真实样例55行171件，旧/新公司模式都输出69行候选展示、数量合计206；需要在Excel删选后再使用。合并后的原值差异可放到附表提醒，不改变旧主表、不阻断下载。
+
+“附原始输入和Excel校对提示”是可选增强：保留所有输入、提示组内型号/厂商差异、明确参数冲突及候选处理注意事项；不会伪造审核人或批准结果。关闭后只导出原公司主表。
 
 ## 本地运行
 
-需要 Python ≥3.10（推荐3.12）和 Node ≥20.19（已验证22）。本机系统默认 python3 可能是3.9，请显式选择合适版本。
-
-在仓库根执行：
+需要Python≥3.10（建议3.12）、Node ^20.19或≥22.12；使用者在浏览器里运行时不需要安装Python。
 
     uv venv .venv --python 3.12
     uv pip install --python .venv/bin/python -e './core[dev]' -e './cli' setuptools wheel
@@ -23,60 +34,50 @@
     cd web
     npm ci
     npm run prepare:pyodide
-    npm run dev -- --host 127.0.0.1
-
-浏览器打开终端显示的本机地址。首次依赖准备需要联网下载公开运行时；实际使用过程不会向这些服务发送 BOM。修改 Python 核心后必须重新打 wheel 和 prepare:pyodide，再刷新浏览器。
-
-生产产物本机验证：
-
-    cd web
     npm run build
-    npm run preview -- --host 127.0.0.1
+    npm run preview -- --host 127.0.0.1 --port 4173 --strictPort
 
-prebuild 会阻止缺失运行时或未重新打包的旧核心产物。当前主包约1.38MB，仍有分包优化空间。
+修改Python后务必重新打wheel、prepare和build，不可仅复制旧wheel。现有prebuild主要检查文件存在/时间；目前不是完整的源码内容hash门禁。Worker用wheel内容hash版本加载。
 
-## 使用步骤
+## 命令行
 
-1. 选择三平台 BOM 和可选企业物料表；多工作表可切换。核对识别出的平台和表头行。
-2. 选择已给定布局的中文模板，填写本次标题和套数（默认1，不沿用模板的旧8套/9套）。
-3. 点击“检查 BOM”，默认只看需确认项，直接查看每个问题的字段、原值、库值和原因。需要时搜索选料或修改最终值，保存后重新检查，再确认剩余问题。取消筛选可查看全表，确定项没有确认按钮。
-4. 未处理问题可导出待校对稿；无未处理问题即可正式导出，无须逐行点确认。未关联库/缺编码/缺封装等情况需填写保留原因，工具不会编造值。
-5. 重新导入会清空会话确认。当前不跨刷新保存会话，请先导出校对稿留存；它不是可重新导入的确认凭证。
+CLI与默认网页使用相同Excel转换核心，保留原参数和输出防覆盖/占用重试：
 
-## 测试
+    .venv/bin/bomkit input.xlsx -m material.xlsx -o output.xlsx \
+      --pcba-name "PCBA名称" --pcba-model "PCBA型号" \
+      --pcb-name "空板名称" --pcb-model "空板型号"
 
-公开合成测试：
+新增可选参数：--platform auto|jlc|altium|cadence、--bom-sheet、--material-sheet、--with-trace。CLI默认不加附表，保持旧单主表形式。不指定-o时使用不重名文件；显式-o按用户指定位置写入。
+
+## 回归
 
     .venv/bin/python -m pytest core/tests -q
-    cd web && npm test && npm run lint
-
-真实浏览器回归（先启动本机 dev 或 preview）：
-
     cd web
+    npm test
+    npm run lint
     npm run test:e2e
 
-若 Chromium 未安装：npm exec playwright install chromium。E2E 使用真正 Pyodide，不提供 mock 校对；自动确认仅用合成数据。
+E2E默认访问本机preview 4173，使用真正Pyodide；可用BOMKIT_E2E_URL修改。test:e2e:excel单测默认Excel流程，test:e2e:review单测可选网页流程。
 
-私有矩阵仅在已获授权的样例存在时运行，资料和产物均被 Git 忽略：
+有授权私有样例时再显式启用：
 
-    .venv/bin/python core/tests/private_regression.py
-    cd web
     BOMKIT_PRIVATE_TESTS=1 npm test
     BOMKIT_PRIVATE_TESTS=1 npm run test:e2e
 
-指定生产preview地址可设置 BOMKIT_E2E_URL=http://127.0.0.1:4173/ 。私有输入位置与命名见 docs/07-validation.md。
+公开公司黄金快照仅含11套合成数据，断言主表值/文本类型/样式/合并/宽高；不包含公司明细。真实样例输出仅保存在Git忽略的private目录，技术自动化结果禁止投产。
 
-## 验收边界
+## 边界
 
-代码闭环、单测、真实浏览器、私有输出回读证明软件行为，不保证真实元件选型一定正确，也不替代企业生产审核。只有无法确定或存在冲突的项需要在工具内人工确认，不要求重复核对确定项。脚本生成的“技术模拟禁止投产”文件不是业务审核结果。
+- 默认公司主表已做旧工具对照；自定义中文模板仍在可选网页入口，尚未迁入默认Excel模式。远端独立模板标注/Profile开发线尚未合并，不冒充已集成。
+- 多平台支持限已验证模板；XLS请先转存XLSX。未知PART_NUMBER不猜成企业编码。
+- 默认不保存浏览器会话；下载文件由用户在Excel中编辑保存。没有ERP直连、云端自动保存、Service Worker离线保证或生产物料批准能力。
+- 主bundle仍有大chunk提示；当前只做本地验证，未公开部署。
+- 公司输入/物料表/模板/输出只放core/tests/fixtures/private/；只可部署web/dist，不能将整个工作区发布。
 
-仅支持已验证的导出/中文模板结构，不是任意模板设计器。未知 PART_NUMBER 不自动认作企业编码。原 v1 CLI 为兼容入口，不含新人工确认门禁；需要门禁请使用网页 v2。
+## 文档
 
-## 文档与数据红线
-
-- docs/06-review-contract-v2.md：新闭环契约，优先用于本次功能。
-- docs/07-validation.md：实测证据、复现命令、验收范围。
-- docs/01-architecture.md、03-milestones.md、04-agent-tasks.md、05-migration-map.md：历史设计和迁移参考，未做的旧宏大范围不自动算首版已交付。
-- docs/02-contracts.md：v1 原文冻结，新API独立实现，不改旧契约。
-- 公司真实输入/模板/输出只放 core/tests/fixtures/private/；docs 中已提供的表格/压缩包也已 Git 忽略，禁止提交。
-- 前身 jlc_bom_converter 仅只读参考，未修改。
+- docs/08-excel-first.md：当前默认工作流与兼容验收。
+- docs/06-review-contract-v2.md：可选网页校对规则，不约束默认Excel导出。
+- docs/07-validation.md：此前v2交付记录，历史时点证据。
+- docs/02-contracts.md：v1冻结契约，未改；新Excel入口为独立扩展。
+- docs/01-architecture.md、03-milestones.md、04-agent-tasks.md、05-migration-map.md：历史设计及迁移参考，不把未完成计划算交付。

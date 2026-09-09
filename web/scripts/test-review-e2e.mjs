@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx';
 const webRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const root=path.join(path.dirname(webRoot),'core/tests/fixtures/private/closed-loop');
 const output=path.join(root,'outputs/e2e'), inputs=path.join(root,'inputs');
-const baseURL=process.env.BOMKIT_E2E_URL || 'http://127.0.0.1:5173/';
+const baseURL=process.env.BOMKIT_E2E_URL || 'http://127.0.0.1:4173/';
 const origin=new URL(baseURL).origin;
 await fs.mkdir(output,{recursive:true});
 const report={engine:'Chromium + real Pyodide',baseURL,syntheticConfirmationOnly:true,cases:[],external:[],uploads:[],runtime:[]};
@@ -57,7 +57,7 @@ async function download(button,name,count,total) {
   return {w,header,rows};
 }
 try {
-  await page.goto(baseURL);await page.getByRole('button',{name:'开始转换',exact:true}).click();
+  await page.goto(baseURL);await page.getByRole('button',{name:'网页校对（可选）',exact:true}).click();
   const bom=fixture('synthetic-jlc.xlsx',[
     ['Designator','Quantity','Name','Device','Footprint','Comment'],
     ['R1','1','10kΩ','SYNTHETIC-MODEL-A','0603',''],

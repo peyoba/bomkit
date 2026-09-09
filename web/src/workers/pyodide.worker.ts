@@ -77,7 +77,7 @@ getPyodide().catch((err) => {
 
 interface WorkerRequestMessage {
   id: number;
-  fn: "detect" | "analyze" | "render" | "review";
+  fn: "detect" | "analyze" | "render" | "review" | "excel";
   args: unknown;
 }
 
@@ -97,6 +97,16 @@ function toErrorPayload(err: unknown): { code: string; message: string } {
 async function handleRequest({ id, fn, args }: WorkerRequestMessage) {
   try {
     const pyodide = await getPyodide();
+    if (fn === "excel") {
+      const api = pyodide.pyimport("bomcore.excel_api");
+      const pyArgs = pyodide.toPy(args);
+      let output;
+      try {
+        output = api.convert_excel(pyArgs);
+        self.postMessage({id, ok: true, result: output.toJs({dict_converter: Object.fromEntries})});
+      } finally {output?.destroy(); pyArgs.destroy(); api.destroy();}
+      return;
+    }
     if (fn === "review") {
       const {action, ...params} = args as Record<string, unknown>;
       const api = pyodide.pyimport("bomcore.review_api");

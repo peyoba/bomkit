@@ -20,8 +20,10 @@ import type {
   WorkerErrorPayload,
 } from "../types/contracts";
 import type { ReviewAction } from "../types/review";
+import type { ExcelArgs, ExcelResult } from "../types/excel";
 
 export interface WorkerClient {
+  excel(args: ExcelArgs): Promise<ExcelResult>;
   detect(args: DetectArgs): Promise<DetectResult>;
   analyze(args: AnalyzeArgs): Promise<AnalyzeResult>;
   render(args: RenderArgs): Promise<Uint8Array>;
@@ -109,7 +111,7 @@ export function createPyodideWorkerClient(options: PyodideWorkerClientOptions = 
     }
   };
 
-  function call<TResult>(fn: "detect" | "analyze" | "render" | "review", args: unknown): Promise<TResult> {
+  function call<TResult>(fn: "detect" | "analyze" | "render" | "review" | "excel", args: unknown): Promise<TResult> {
     if (fatalError) return Promise.reject(fatalError);
     const id = nextId++;
     return new Promise<TResult>((resolve, reject) => {
@@ -119,6 +121,7 @@ export function createPyodideWorkerClient(options: PyodideWorkerClientOptions = 
   }
 
   return {
+    excel: (args: ExcelArgs) => call<ExcelResult>("excel", args),
     detect: (args: DetectArgs) => call<DetectResult>("detect", args),
     analyze: (args: AnalyzeArgs) => call<AnalyzeResult>("analyze", args),
     render: (args: RenderArgs) => call<Uint8Array>("render", args),

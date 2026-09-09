@@ -1,42 +1,35 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""bomkit CLI 入口（薄壳）。参数兼容旧 jlc_bom_converter.py，复用 bomcore.api。
+"""公司Excel优先CLI：保留旧命令参数、分组/候选/公司格式，网页无需确认。
 
-差异说明（相对旧 CLI）：
-- 旧 CLI 直接用 pandas 读 xlsx；本 CLI 用 openpyxl 读取并转换为 rows-JSON
-  （字符串化规则见 docs/02-contracts.md #2），再交给 bomcore.api。
-- 默认走内置 "嘉立创EDA 专业版" + "金蝶完整物料表" + "默认 PCBA 模板" 三个 Profile，
-  与旧工具默认行为等价（旧核心固定假设这两种格式）。
-- 输出路径的非覆盖式自动命名（旧核心 _generate_output_filename）在此保留，
-  因为这是 CLI 独有职责（Web 端浏览器下载无此问题，见 05-migration-map.md #1）。
+与网页默认入口共享bomcore.excel_api；原v1 API及可选v2会话仍独立保留。
 """
+
 from __future__ import annotations
 
 import argparse
-import json
 import sys
-from importlib import resources
+import time
 from pathlib import Path
 
-from openpyxl import load_workbook
-
-from bomcore.api import analyze, render
+from bomcore.excel_api import convert_excel
+from bomcore.review_import import read_file
 from bomcore.schema import ProfileError
 
 
-def _load_builtin_profile(filename: str) -> dict:
-    data = resources.files("bomcore").joinpath("presets", filename).read_text(encoding="utf-8")
-    return json.loads(data)
-
-
 def _read_xlsx_as_rows(path: str) -> list[list[str]]:
-    """openpyxl 读取器：str(v) if v is not None else ""（见 05-migration-map.md #3）。"""
-    wb = load_workbook(path, data_only=True)
-    ws = wb.worksheets[0]
-    rows = []
-    for row in ws.iter_rows(values_only=True):
-        rows.append(["" if v is None else str(v) for v in row])
-    return rows
+    """兼容保留旧内部读取函数名，统一采用可靠的本机读取器。"""
+    return read_file(path)["rows"]
+
+
+def _save_with_retry(path: str, data: bytes) -> None:
+    for attempt in range(3):
+        try:
+            Path(path).write_bytes(data)
+            return
+        except PermissionError:
+            if attempt == 2:
+                raise
+            print("文件被占用，1秒后重试；请关闭Excel中的输出文件")
+            time.sleep(1)
 
 
 def _generate_output_filename(input_file: str) -> str:
@@ -60,21 +53,62 @@ def _generate_output_filename(input_file: str) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="bomkit",
-        description="将 EDA 导出的 BOM 转换为公司 PCBA BOM 模板格式（bomkit CLI）。",
+        description="按原公司规则转换BOM，在Excel中处理候选与校对。",
     )
-    parser.add_argument("input_file", help="BOM Excel 文件（默认按嘉立创EDA专业版预设解析）")
-    parser.add_argument("-o", "--output", dest="output_file", default=None,
-                         help="输出文件路径（默认在输入文件旁自动生成，避免覆盖已有文件）")
-    parser.add_argument("-m", "--material", dest="material_code_file", default=None,
-                         help="物料编码表 Excel 文件（可选，默认按金蝶完整物料表预设解析）")
-    parser.add_argument("--pcba-name", dest="pcba_name", default="",
-                         help="PCBA 名称，填入输出表格表头第2行")
-    parser.add_argument("--pcba-model", dest="pcba_model", default="",
-                         help="PCBA 型号，填入输出表格表头第2行")
-    parser.add_argument("--pcb-name", dest="pcb_name", default="",
-                         help="PCB 空板名称，填入输出表格序号1行")
-    parser.add_argument("--pcb-model", dest="pcb_model", default="",
-                         help="PCB 空板型号，填入输出表格序号1行")
+    parser.add_argument(
+        "input_file", help="BOM文件（自动识别嘉立创/Altium/Cadence；支持XLSX/TXT/TSV/CSV）"
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        dest="output_file",
+        default=None,
+        help="输出文件路径（默认在输入文件旁自动生成，避免覆盖已有文件）",
+    )
+    parser.add_argument(
+        "-m",
+        "--material",
+        dest="material_code_file",
+        default=None,
+        help="物料表文件（可选，支持金蝶完整或旧简易格式）",
+    )
+    parser.add_argument(
+        "--pcba-name",
+        dest="pcba_name",
+        default="",
+        help="PCBA 名称，填入输出表格表头第2行",
+    )
+    parser.add_argument(
+        "--pcba-model",
+        dest="pcba_model",
+        default="",
+        help="PCBA 型号，填入输出表格表头第2行",
+    )
+    parser.add_argument(
+        "--pcb-name",
+        dest="pcb_name",
+        default="",
+        help="PCB 空板名称，填入输出表格序号1行",
+    )
+    parser.add_argument(
+        "--pcb-model",
+        dest="pcb_model",
+        default="",
+        help="PCB 空板型号，填入输出表格序号1行",
+    )
+    parser.add_argument(
+        "--platform",
+        choices=["auto", "jlc", "altium", "cadence"],
+        default="auto",
+        help="输入平台，默认自动识别；嘉立创Device列可选",
+    )
+    parser.add_argument("--bom-sheet", default=None, help="选择BOM工作表")
+    parser.add_argument("--material-sheet", default=None, help="选择物料表工作表")
+    parser.add_argument(
+        "--with-trace",
+        action="store_true",
+        help="附原始输入和Excel校对提示，不改变公司主表",
+    )
     return parser
 
 
@@ -83,29 +117,29 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    output_file = args.output_file or _generate_output_filename(args.input_file)
-
     try:
-        bom_rows = _read_xlsx_as_rows(args.input_file)
-        bom_profile = _load_builtin_profile("jlc_eda_bom_input.json")
-
-        material_rows = None
-        material_profile = None
-        if args.material_code_file:
-            material_rows = _read_xlsx_as_rows(args.material_code_file)
-            material_profile = _load_builtin_profile("kingdee_material_input.json")
-
-        result = analyze(bom_rows, material_rows, bom_profile, material_profile)
-
-        output_profile = _load_builtin_profile("default_output_template.json")
-        meta = {
-            "pcba_name": args.pcba_name, "pcba_model": args.pcba_model,
-            "pcb_name": args.pcb_name, "pcb_model": args.pcb_model,
-            "material_code": "",
-        }
-        xlsx_bytes = render(result["items"], output_profile, meta)
-
-        Path(output_file).write_bytes(xlsx_bytes)
+        output_file = args.output_file or _generate_output_filename(args.input_file)
+        bom_rows = read_file(args.input_file, args.bom_sheet)["rows"]
+        material_rows = (
+            read_file(args.material_code_file, args.material_sheet)["rows"]
+            if args.material_code_file
+            else None
+        )
+        result = convert_excel(
+            {
+                "bom_rows": bom_rows,
+                "material_rows": material_rows,
+                "platform": args.platform,
+                "meta": {
+                    "pcba_name": args.pcba_name,
+                    "pcba_model": args.pcba_model,
+                    "pcb_name": args.pcb_name,
+                    "pcb_model": args.pcb_model,
+                },
+                "include_trace": args.with_trace,
+            }
+        )
+        _save_with_retry(output_file, result["data"])
     except ProfileError as exc:
         print(f"错误: {exc.message}")
         return 1

@@ -1,9 +1,10 @@
 # bomcore
 
-Python核心仅依赖openpyxl，无pandas。v1 api.py保留兼容；本次新闭环使用：
+纯Python核心依赖openpyxl，无pandas：
 
-- review_import.py：三平台共享预设、原文留存、文本编码/Excel范围兼容。
-- review_api.py：物料索引、推荐、人工确认状态与失效规则、Worker动作。
-- review_export.py：用户模板布局、清旧数据、校对记录/原始输入、正式导出门禁。
+- excel_api.py：默认公司Excel兼容流程；原分组/排序/候选展开，公司元信息、旧颜色与可选原始输入/提示附表。不要求网页确认。
+- api.py / render.py：冻结v1接口保留，不直接改写旧契约。
+- review_api.py / review_rules.py / review_export.py：可选v2网页核对流程，独立会话与确认规则。
+- review_import.py：共享已知EDA输入定位、读取和原文保留，嘉立创Device列可选。
 
-安装、打包与全部测试命令见仓库根README。公开测试只使用合成数据；private_regression.py显式读取gitignored样例并生成禁止投产的技术输出，不替代业务确认。
+CLI与默认网页共用excel_api。11套公开合成旧工具黄金快照验证主表兼容；私有生成物只留Git忽略目录，不代用户审核生产料号。

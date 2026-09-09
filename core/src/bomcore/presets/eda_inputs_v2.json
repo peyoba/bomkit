@@ -1,7 +1,7 @@
 [
   {
     "id": "jlc", "platform": "jlc", "name": "嘉立创 EDA",
-    "required_headers": ["designator", "quantity", "footprint", "name", "device"],
+    "required_headers": ["designator", "quantity", "footprint", "name"],
     "column_map": {"designator": "designator", "quantity": "qty", "name": "value", "device": "mpn", "footprint": "footprint", "manufacturer": "manufacturer", "comment": "description", "secondary category": "category", "tolerance": "tolerance"}
   },
   {
