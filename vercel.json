@@ -1,13 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "npm --prefix web ci",
+  "installCommand": "npm --prefix web ci --include=dev",
   "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "web/dist",
   "headers": [
     {
       "source": "/pyodide/bomcore-manifest.json",
-      "headers": [{"key": "Cache-Control", "value": "no-store"}]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
     }
   ]
 }

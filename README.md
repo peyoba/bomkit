@@ -1,5 +1,7 @@
 # bomkit — BOM 转换与 Excel 校对
 
+这是个人项目；“原公司工具”仅指兼容基线，不代表公司部署或使用。
+
 **以原公司工具为兼容基线：按旧规则合并、排序、展开候选，下载后在 Excel 中处理。网页校对只是可选增强，不再是默认导出的门槛。**
 
 ## 两种入口
@@ -71,7 +73,7 @@ E2E默认访问本机preview 4173，使用真正Pyodide；可用BOMKIT_E2E_URL�
 - 默认公司主表已做旧工具对照；自定义中文模板仍在可选网页入口，尚未迁入默认Excel模式。远端独立模板标注/Profile开发线尚未合并，不冒充已集成。
 - 多平台支持限已验证模板；XLS请先转存XLSX。未知PART_NUMBER不猜成企业编码。
 - 默认不保存浏览器会话；下载文件由用户在Excel中编辑保存。没有ERP直连、云端自动保存、Service Worker离线保证或生产物料批准能力。
-- 主bundle仍有大chunk提示；当前只做本地验证，未公开部署。
+- 主bundle仍有大chunk提示；本地验收及GitHub→Vercel部署分别见下方记录。
 - 公司输入/物料表/模板/输出只放core/tests/fixtures/private/；只可部署web/dist，不能将整个工作区发布。
 
 ## 文档
@@ -81,3 +83,11 @@ E2E默认访问本机preview 4173，使用真正Pyodide；可用BOMKIT_E2E_URL�
 - docs/07-validation.md：此前v2交付记录，历史时点证据。
 - docs/02-contracts.md：v1冻结契约，未改；新Excel入口为独立扩展。
 - docs/01-architecture.md、03-milestones.md、04-agent-tasks.md、05-migration-map.md：历史设计及迁移参考，不把未完成计划算交付。
+
+## GitHub → Vercel
+
+仓库：<https://github.com/peyoba/bomkit>。Vercel项目bomkit位于个人空间peyobas-projects，生产分支为codex/excel-first-compat；没有覆盖远端main。
+
+构建从仓库根目录运行：npm在web安装完整构建依赖，scripts/vercel-build.sh选择Python≥3.10、安装固定打包工具、重新构建bomcore wheel、准备自托管Pyodide并构建网页。只发布web/dist，不部署Python函数、不使用数据库，也不需要上传BOM资料。
+
+详情见docs/09-vercel.md。每次推送生产分支由原生GitHub连接触发部署；必须以Vercel READY及线上验收结果判断成功，不能只看git push成功。
