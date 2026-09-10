@@ -13,7 +13,8 @@
     "test:e2e": "node scripts/test-excel-e2e.mjs && node scripts/test-review-e2e.mjs",
     "prepare:pyodide": "node scripts/prepare-pyodide.mjs",
     "test:e2e:excel": "node scripts/test-excel-e2e.mjs",
-    "test:e2e:review": "node scripts/test-review-e2e.mjs"
+    "test:e2e:review": "node scripts/test-review-e2e.mjs",
+    "test:e2e:ui": "node scripts/test-a-ui-e2e.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

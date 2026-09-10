@@ -42,6 +42,9 @@ async function setInput(bom,material,meta,trace){
 }
 async function download(name){
   assert.equal(await id('confirm-row').count(),0);
+  // Chromium会节流瞬时连续下载；无动画的新UI比旧Ant按钮更快，不应把自动化节流误当转换失败。
+  // 独立探针：连续约50ms的第11次被拦截，250ms节奏的13次全部成功。仅测试放慢，不改产品输出。
+  await page.waitForTimeout(250);
   const p=page.waitForEvent('download',{timeout:120000});await id('excel-convert').click();const d=await p;
   const target=path.join(output,name+'.xlsx');await d.saveAs(target);assert.equal(await d.failure(),null);
   await id('excel-result').waitFor();
@@ -92,5 +95,10 @@ try{
   assert.ok(runtime.has('pyodide.asm.wasm')&&runtime.has('bomcore-0.1.0-py3-none-any.whl'));
   report.runtime=[...runtime];report.passed=true;
   console.log('Excel-first real Pyodide passed:',report.cases.length,'cases');
-}catch(e){report.passed=false;report.error=String(e);throw e;}
+}catch(e){
+  report.passed=false;report.error=String(e);
+  report.uiDiagnostics=await page.evaluate(()=>({text:document.querySelector('main')?.innerText,invalid:[...document.querySelectorAll(':invalid')].map(e=>({tag:e.tagName,type:e.type,id:e.id,message:e.validationMessage})),button:document.querySelector('[data-testid="excel-convert"]')?.outerHTML})).catch(()=>null);
+  await page.screenshot({path:path.join(output,'failure.png'),fullPage:true}).catch(()=>{});
+  throw e;
+}
 finally{await fs.writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2));await browser.close();}
