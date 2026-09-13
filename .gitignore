@@ -44,3 +44,5 @@ Thumbs.db
 # ── Playwright ──
 test-results/
 playwright-report/
+.cloudflare/
+.build/
