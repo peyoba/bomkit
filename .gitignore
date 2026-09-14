@@ -1,11 +1,19 @@
 # ── 公司真实数据（红线：永不入库）──
 core/tests/fixtures/private/
+# 用户提供的真实样例不得进入代码仓库（保留原路径，不移动用户文件）
+docs/*.xlsx
+docs/*.xls
+docs/*.rar
+docs/*.zip
+docs/bom资料/
 *.secret.*
 
 # ── Python ──
 __pycache__/
 *.py[cod]
 .venv/
+.vercel/
+.vercel-build/
 venv/
 dist/
 build/
@@ -36,3 +44,5 @@ Thumbs.db
 # ── Playwright ──
 test-results/
 playwright-report/
+.cloudflare/
+.build/
