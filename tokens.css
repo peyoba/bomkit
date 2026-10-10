@@ -1,31 +1,54 @@
-/* Hallmark · macrostructure: A workbench · tone: approved light professional · anchor hue: cobalt */
+/* Hallmark · macrostructure: E proof-read · tone: graph paper with a single proof-red · anchor hue: vermilion */
 :root {
   color-scheme: light;
-  --color-paper: oklch(100% 0 0);
-  --color-ink: oklch(27.336% .03653 255.420);
-  --color-secondary: oklch(48.847% .03659 257.277);
-  --color-muted: oklch(54.208% .03651 259.971);
-  --color-line: oklch(91.054% .01268 255.509);
-  --color-accent: oklch(48.141% .18442 264.800);
-  --color-accent-ink: oklch(44.879% .16384 263.608);
-  --color-surface: oklch(96.601% .00624 255.475);
-  --color-accent-wash: oklch(96.026% .01444 264.499);
-  --color-input-border: oklch(86.388% .02050 257.477);
-  --color-hover-border: oklch(67.899% .07009 263.937);
-  --color-hover-paper: oklch(99.115% .00411 271.371);
-  --color-success: oklch(45.898% .08350 161.775);
-  --color-warning: oklch(49.847% .10214 62.908);
-  --color-error: oklch(50.373% .17916 20.660);
-  --color-shadow: oklch(30% .025 255 / .05);
-  --font-display: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  --font-body: var(--font-display);
-  --font-numeric: "DIN Alternate", "Avenir Next", sans-serif;
+
+  /* 纸面：冷灰绿方格纸底，内容贴在不透明白纸块上 */
+  --color-paper: oklch(97.4% .006 148);
+  --color-paper-raised: oklch(99.2% .003 148);
+  --color-grid: oklch(93.6% .008 148);
+  --color-grid-strong: oklch(90% .010 148);
+
+  /* 线与墨 */
+  --color-line: oklch(85% .012 148);
+  --color-line-soft: oklch(91.5% .008 148);
+  --color-ink: oklch(23.5% .016 190);
+  --color-secondary: oklch(45% .014 190);
+  --color-muted: oklch(50% .013 190);
+
+  /* 校对红：全站唯一强调色，只用于需要人工判断的地方 */
+  --color-accent: oklch(53% .185 32);
+  --color-accent-ink: oklch(45% .17 30);
+  --color-accent-wash: oklch(95.5% .026 32);
+
+  /* 状态色：成功与提醒不使用红 */
+  --color-success: oklch(46% .075 162);
+  --color-success-wash: oklch(96% .018 162);
+  --color-warning: oklch(50% .12 68);
+  --color-warning-wash: oklch(96.5% .028 68);
+  --color-error: oklch(47% .20 27);
+  --color-error-wash: oklch(96% .022 27);
+
+  /* 兼容旧变量名，指向方向 E 的纸面 */
+  --color-surface: var(--color-paper-raised);
+  --color-hover-paper: var(--color-paper-raised);
+  --color-input-border: var(--color-line);
+  --color-hover-border: oklch(55% .03 190);
+  --color-shadow: oklch(30% .02 148 / .06);
+
+  /* 排印：标题用窄体，数字与编码一律等宽 */
+  --font-display: "Avenir Next Condensed", "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-body: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SF Mono", "Menlo", "DIN Alternate", ui-monospace, monospace;
+  --font-numeric: var(--font-mono);
   --text-xs: .75rem;
   --text-sm: .875rem;
   --text-body: .9375rem;
   --text-action: 1rem;
   --text-section: 1.125rem;
   --text-title: clamp(1.625rem, 2.25vw, 2rem);
+  --text-hero: clamp(2.25rem, 4vw, 3.125rem);
+
+  /* 间距 */
   --space-1: .25rem;
   --space-2: .5rem;
   --space-3: .75rem;
@@ -38,12 +61,20 @@
   --space-11: 2.75rem;
   --space-12: 3rem;
   --space-16: 4rem;
-  --radius-input: .25rem;
-  --radius-control: .3125rem;
-  --radius-panel: .375rem;
+
+  /* 形状：以方角为主，纸块 3px */
+  --radius-input: 2px;
+  --radius-control: 2px;
+  --radius-panel: 3px;
+  --radius-block: 3px;
   --rule-thin: 1px;
   --control-height: 2.75rem;
-  --action-height: 3.125rem;
+  --action-height: 3.25rem;
+
+  /* 方格纸单元 */
+  --cell: 24px;
+  --cell-major: 120px;
+
   --ease-out: cubic-bezier(.16, 1, .3, 1);
   --dur-fast: 120ms;
 }

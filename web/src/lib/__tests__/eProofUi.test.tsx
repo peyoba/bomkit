@@ -14,9 +14,9 @@ const table: LoadedTable = {rows: [["Name"], ["DEMO"]], sheet_name: "BOM", sheet
 const mockedLoad = vi.mocked(loadTable);
 afterEach(cleanup);
 beforeEach(() => vi.clearAllMocks());
-const props = () => ({label: "BOM 文件", id: "bom-file", value: null, onChange: vi.fn(), onLoading: vi.fn(), disabled: false, appearance: "a" as const});
+const props = () => ({label: "BOM 文件", id: "bom-file", value: null, onChange: vi.fn(), onLoading: vi.fn(), disabled: false, appearance: "e" as const});
 
-describe("A方案真实文件控件", () => {
+describe("方向 E 文件格", () => {
   it("空态不预填示例文件，仍保留原生文件输入", () => {
     render(<LocalTableInput {...props()} />);
     const field = screen.getByLabelText("BOM 文件") as HTMLInputElement;
@@ -62,14 +62,14 @@ describe("A方案真实文件控件", () => {
   });
 });
 
-describe("A方案范围约束", () => {
+describe("方向 E 范围约束", () => {
   it("样式示意始终注明是合成局部，没有审批或实时数据", () => {
     render(<OutputExample />);
     expect(screen.getByText("主表局部 · 合成示例，非实时预览")).not.toBeNull();
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
     expect(screen.queryAllByRole("button")).toHaveLength(0);
   });
-  it("导航保留Excel和可选网页路径，不提供B/主题混合", () => {
+  it("导航保留 Excel 和可选网页路径，不提供主题切换", () => {
     const navigate = vi.fn();
     render(<AppHeader route="excel" onNavigate={navigate} />);
     expect(screen.getByRole("button", {name: "Excel 转换"}).getAttribute("aria-current")).toBe("page");

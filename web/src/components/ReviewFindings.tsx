@@ -3,7 +3,7 @@ import type { ReviewFinding } from "../types/review";
 /** 列表和详情共用同一份后端证据；没有问题时不制造标签或占位提示。 */
 export function ReviewFindings({ findings }: { findings: ReviewFinding[] }) {
   if (!findings.length) return null;
-  return <ul className="review-findings" data-testid="review-findings">
+  return <ul className="e-review-findings" data-testid="review-findings">
     {findings.map((finding, index) => <li key={`${finding.code}-${finding.field}-${index}`}>
       <strong>{finding.label}：{finding.reason}</strong>
       <div><span>BOM 原值：</span><code>{finding.original || "（空）"}</code></div>

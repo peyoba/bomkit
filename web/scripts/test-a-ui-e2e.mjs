@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** A浅色方案：真实输入/清除/键盘与响应式检查；不改变业务契约，不上传资料。 */
+/** 方向 E：真实输入/清除/键盘与响应式检查；不改变业务契约，不上传资料。 */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -12,7 +12,7 @@ const output=path.join(root,'core/tests/fixtures/private/ui-a-validation');
 await fs.mkdir(output,{recursive:true});
 const baseURL=process.env.BOMKIT_E2E_URL || 'http://127.0.0.1:4173/';
 const origin=new URL(baseURL).origin;
-const report={baseURL,style:'A only / light',cases:[],layouts:[],external:[],uploads:[],errors:[]};
+const report={baseURL,style:'E proof-read',cases:[],layouts:[],external:[],uploads:[],errors:[]};
 const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({viewport:{width:1440,height:960},acceptDownloads:true});
 await context.route('**/*',async route=>{
@@ -36,7 +36,7 @@ async function layout(name,width){
       const s=getComputedStyle(e),r=e.getBoundingClientRect();
       return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0&&(r.left < -1||r.right > innerWidth+1);
     }).map(e=>({tag:e.tagName,cls:e.className?.baseVal ?? e.className,text:(e.innerText||'').slice(0,45)}));
-    const wraps=[...document.querySelectorAll('header button,.a-primary')].filter(e=>{
+    const wraps=[...document.querySelectorAll('header button,.e-btn-primary')].filter(e=>{
       const r=document.createRange();r.selectNodeContents(e);return new Set([...r.getClientRects()].filter(r=>r.width>1).map(r=>Math.round(r.top/10))).size>2;
     }).map(e=>e.textContent);
     const tiny=[...document.querySelectorAll('main input:not([type="checkbox"]):not([type="file"]),main select,button')].filter(e=>e.getBoundingClientRect().width>0&&parseFloat(getComputedStyle(e).fontSize)<12).map(e=>e.getAttribute('aria-label')||e.textContent);
@@ -51,7 +51,7 @@ try{
   await page.screenshot({path:path.join(output,'home-desktop.png'),fullPage:true});
   await page.getByRole('button',{name:'开始转换',exact:true}).click();await id('excel-convert').waitFor();
   assert.equal(await id('excel-convert').isDisabled(),true);
-  assert.equal(await page.locator('.a-file-name').filter({hasText:'示例BOM.xlsx'}).count(),0);
+  assert.equal(await page.locator('.e-file-name').filter({hasText:'示例BOM.xlsx'}).count(),0);
   await page.waitForFunction(()=>!document.querySelector('[data-testid="engine-status"]'),null,{timeout:120000});
   await page.screenshot({path:path.join(output,'empty-desktop.png'),fullPage:true});
   for(const width of [320,375,414,768,1280,1440])await layout('empty-workspace',width);
@@ -99,6 +99,6 @@ try{
   await page.getByRole('button',{name:'bomkit 首页',exact:true}).click();await page.getByRole('button',{name:'开始转换',exact:true}).waitFor();
   report.cases.push({name:'optional-review-and-home-retained',passed:true});
   assert.deepEqual(report.errors,[]);assert.deepEqual(report.external,[]);assert.deepEqual(report.uploads,[]);
-  report.passed=true;console.log('A UI passed:',report.cases.length,'flows,',report.layouts.length,'layout checks');
+  report.passed=true;console.log('E UI passed:',report.cases.length,'flows,',report.layouts.length,'layout checks');
 }catch(error){report.passed=false;report.error=String(error);throw error;}
 finally{await fs.writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2));await browser.close();}
