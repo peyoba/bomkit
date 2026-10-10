@@ -41,8 +41,13 @@ Thumbs.db
 .vscode/
 *.log
 
-# ── Playwright ──
+# ── Playwright / 设计工具产物 ──
 test-results/
 playwright-report/
 .cloudflare/
 .build/
+
+# ── 本机设计探索与临时产物（docs 中以“本机路径”引用，不入库）──
+output/
+tmp/
+test_opamp.svg
