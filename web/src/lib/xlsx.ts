@@ -36,11 +36,6 @@ export async function readXlsxRows(file: File | ArrayBuffer, sheetName?: string)
   return { rows: rows as string[][], sheet_name: targetSheet };
 }
 
-/** 只读取前 N 行，用于 detect 的即时反馈（不必等 Pyodide/整份文件解析完）。 */
-export async function readXlsxRowsPreview(file: File, maxRows = 50): Promise<RowsPayload> {
-  const full = await readXlsxRows(file);
-  return { rows: full.rows.slice(0, maxRows), sheet_name: full.sheet_name };
-}
 
 export function listSheetNames(file: File | ArrayBuffer): Promise<string[]> {
   return (file instanceof ArrayBuffer ? Promise.resolve(file) : file.arrayBuffer()).then((buffer) => {
