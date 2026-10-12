@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Checkbox, Descriptions, Input, InputNumber, Modal, Progress, Select, Space, Table, Typography, message } from "antd";
 import { getWorkerClient } from "../workers/singleton";
 import { useWorkerStore } from "../stores/workerStore";
+import { useSessionStore } from "../stores/sessionStore";
 import { detectReviewInput, fileBase64 } from "../lib/reviewInput";
 import { LocalTableInput } from "../components/LocalTableInput";
 import { ReviewFindings } from "../components/ReviewFindings";
-import type { FinalFields, LoadedTable, Platform, ReviewItem, ReviewMaterial, ReviewSnapshot } from "../types/review";
+import type { FinalFields, ReviewItem, ReviewMaterial, ReviewSnapshot } from "../types/review";
 
 const { Paragraph, Text } = Typography;
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
@@ -108,22 +109,19 @@ function RowEditor({item, reviewer, onReviewer, onUpdate, onClose}: {item: Revie
 }
 
 export function ReviewWorkspace() {
-  const [bom, setBom] = useState<LoadedTable | null>(null);
-  const [material, setMaterial] = useState<LoadedTable | null>(null);
-  const [bomReading, setBomReading] = useState(false);
-  const [materialReading, setMaterialReading] = useState(false);
-  const [platform, setPlatform] = useState<Platform>("auto");
-  const [template, setTemplate] = useState<{name: string; b64: string} | null>(null);
+  // 与 Excel 转换共用同一份已选文件、平台与草稿；来回切换入口不需要重新上传。
+  const {
+    bom, material, bomFile, materialFile, bomReading, materialReading, platform,
+    setBom, setMaterial, setBomFile, setMaterialFile, setBomReading, setMaterialReading, setPlatform,
+    reviewSnapshot: snapshot, reviewTemplate: template, reviewTitle: title, reviewBatch: batch,
+    reviewReviewer: reviewer, reviewPendingOnly: pendingOnly, reviewSearch: search,
+    setReviewSnapshot, updateReviewSnapshot, patchReview,
+  } = useSessionStore();
+  const setReviewer = (v: string) => patchReview({reviewReviewer: v});
   const [templateBusy, setTemplateBusy] = useState(false);
-  const [title, setTitle] = useState("");
-  const [batch, setBatch] = useState(1);
-  const [snapshot, setSnapshot] = useState<ReviewSnapshot | null>(null);
-  const [reviewer, setReviewer] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
-  const [pendingOnly, setPendingOnly] = useState(true);
-  const [search, setSearch] = useState("");
   const engine = useWorkerStore();
   useEffect(() => {getWorkerClient();}, []);
   const format = useMemo(() => {if (!bom) return null; try {return detectReviewInput(bom.rows, platform);} catch {return null;}}, [bom,platform]);
@@ -132,16 +130,16 @@ export function ReviewWorkspace() {
   const confirmed = snapshot?.items.filter(i => i.confirmed).length ?? 0;
   const automatic = snapshot?.items.filter(i => i.review_status === "auto_passed").length ?? 0;
   const pending = snapshot?.items.filter(i => !i.export_ready).length ?? 0;
-  function updateItem(item: ReviewItem) {setSnapshot(prev => prev ? {...prev, items: prev.items.map(i => i.row_id === item.row_id ? item : i)} : prev);}
+  function updateItem(item: ReviewItem) {updateReviewSnapshot(prev => ({...prev, items: prev.items.map(i => i.row_id === item.row_id ? item : i)}));}
   async function start() {
     if (!bom || !format) return;
     setBusy(true); setError(null);
-    try { const result = await getWorkerClient().review<ReviewSnapshot>("start", {bom_rows: bom.rows, material_rows: material?.rows ?? null, platform, source_name: bom.file_name, sheet_name: bom.sheet_name}); setSnapshot(result); setPendingOnly(true); setSearch(""); }
+    try { const result = await getWorkerClient().review<ReviewSnapshot>("start", {bom_rows: bom.rows, material_rows: material?.rows ?? null, platform, source_name: bom.file_name, sheet_name: bom.sheet_name}); setReviewSnapshot(result); patchReview({reviewPendingOnly: true, reviewSearch: ""}); }
     catch (e) {setError(errorText(e));} finally {setBusy(false);}
   }
   async function reset() {
     setBusy(true);
-    try {await getWorkerClient().review("clear"); setSnapshot(null); setError(null); setEditing(null);}
+    try {await getWorkerClient().review("clear"); setReviewSnapshot(null); setError(null); setEditing(null);}
     catch (e) {setError(errorText(e));} finally {setBusy(false);}
   }
   async function download(mode: "draft" | "final") {
@@ -161,13 +159,13 @@ export function ReviewWorkspace() {
       <div><label className="e-field-label" htmlFor="template-file">已有中文 BOM 模板<span className="e-optional">可选</span></label>
         <div className={"e-file-cell is-compact" + (template ? " has-file" : " is-empty") + (busy || templateBusy || editing !== null ? " is-disabled" : "")}>
           <input className="e-native-file" id="template-file" data-testid="template-file" aria-label="输出模板" type="file" accept=".xlsx" disabled={busy || templateBusy || editing !== null} onChange={async e => {
-            const file = e.target.files?.[0]; setTemplate(null); if (!file) return; setTemplateBusy(true);
-            try {setTemplate({name: file.name, b64: await fileBase64(file)});} catch (err) {setError(errorText(err));} finally {setTemplateBusy(false);}
+            const file = e.target.files?.[0]; patchReview({reviewTemplate: null}); if (!file) return; setTemplateBusy(true);
+            try {patchReview({reviewTemplate: {name: file.name, b64: await fileBase64(file)}});} catch (err) {setError(errorText(err));} finally {setTemplateBusy(false);}
           }} />
           <div className="e-file-hit" aria-hidden="true"><span className="e-file-tag">模板</span><span className="e-file-copy"><span className={"e-file-name" + (template ? "" : " is-placeholder")}>{templateBusy ? "正在读取…" : template?.name ?? "选择 .xlsx 模板"}</span></span><span className="e-file-act">{template ? "更换" : "选择"}</span></div>
         </div></div>
-      <div><label className="e-field-label" htmlFor="review-title">本次输出标题</label><Input id="review-title" aria-label="输出标题" placeholder="留空使用输入文件名" value={title} disabled={busy} onChange={e => setTitle(e.target.value)} /></div>
-      <div><label className="e-field-label" htmlFor="review-batch">生产套数</label><InputNumber id="review-batch" aria-label="生产套数" min={1} max={1000000} precision={0} value={batch} disabled={busy} onChange={v => setBatch(v ?? 1)} /></div>
+      <div><label className="e-field-label" htmlFor="review-title">本次输出标题</label><Input id="review-title" aria-label="输出标题" placeholder="留空使用输入文件名" value={title} disabled={busy} onChange={e => patchReview({reviewTitle: e.target.value})} /></div>
+      <div><label className="e-field-label" htmlFor="review-batch">生产套数</label><InputNumber id="review-batch" aria-label="生产套数" min={1} max={1000000} precision={0} value={batch} disabled={busy} onChange={v => patchReview({reviewBatch: v ?? 1})} /></div>
     </div>
     <p className="e-block-note">{template ? `已选择：${template.name}` : "未上传模板时使用默认 7 列格式"}。旧明细将清空，保留列布局和样式；附原始输入与校对记录，批量列按本次套数计算。</p>
   </Block>;
@@ -196,12 +194,12 @@ export function ReviewWorkspace() {
           <Block no="01" title="选择 BOM" labelledBy="step-1" helper={<span className="e-block-helper">必选</span>}>
             <Select aria-label="EDA 平台" value={platform} disabled={busy} style={{width: "100%"}} onChange={setPlatform}
               options={[{value: "auto", label: "自动识别已支持格式"}, {value: "jlc", label: "嘉立创 EDA"}, {value: "altium", label: "Altium Designer"}, {value: "cadence", label: "Cadence（明细 / 汇总）"}]} />
-            <LocalTableInput label="BOM 文件" id="bom-file" value={bom} appearance="e" onChange={setBom} onLoading={setBomReading} disabled={busy} />
+            <LocalTableInput label="BOM 文件" id="bom-file" value={bom} file={bomFile} onFileChange={setBomFile} appearance="e" onChange={setBom} onLoading={setBomReading} disabled={busy} />
             {format && <p className="e-detected" role="status"><span className="e-mark">OK</span>识别为 {format.name}，表头第 {format.header_row_index + 1} 行</p>}
             {bom && !format && <p className="e-file-help is-error" role="alert">未识别到已支持格式，请检查所选平台或工作表</p>}
           </Block>
           <Block no="02" title="选择企业物料库" labelledBy="step-2" helper={<span className="e-block-helper">可选</span>}>
-            <LocalTableInput label="物料库文件" id="material-file" value={material} appearance="e" optional onChange={setMaterial} onLoading={setMaterialReading} disabled={busy} />
+            <LocalTableInput label="物料库文件" id="material-file" value={material} file={materialFile} onFileChange={setMaterialFile} appearance="e" optional onChange={setMaterial} onLoading={setMaterialReading} disabled={busy} />
             <p className="e-block-note">识别「编码、名称、规格型号、禁用状态」。不提供物料库时可校对保留原文；不会生成猜测编码。</p>
           </Block>
         </div>
@@ -247,8 +245,8 @@ export function ReviewWorkspace() {
             {snapshot.skipped_rows.some(r => r.text) && <div className="e-alert is-warning"><span className="e-mark">!</span><div><p className="e-alert-title">原表含表尾备注，请核对（不作为软件指令执行）</p>{snapshot.skipped_rows.filter(r => r.text).map(r => <p className="e-alert-body" key={r.row}>第 {r.row} 行：{r.text}</p>)}</div></div>}
           </div>}
           <div className="e-toolbar">
-            <Input.Search aria-label="筛选校对行" placeholder="搜索位号 / 型号 / 编码" value={search} onChange={e => setSearch(e.target.value)} allowClear style={{width: 280}} />
-            <Checkbox checked={pendingOnly} onChange={e => setPendingOnly(e.target.checked)}>只看需确认项</Checkbox>
+            <Input.Search aria-label="筛选校对行" placeholder="搜索位号 / 型号 / 编码" value={search} onChange={e => patchReview({reviewSearch: e.target.value})} allowClear style={{width: 280}} />
+            <Checkbox checked={pendingOnly} onChange={e => patchReview({reviewPendingOnly: e.target.checked})}>只看需确认项</Checkbox>
             <span className="e-spacer"></span>
             <Button data-testid="export-draft" loading={busy} disabled={editing !== null || templateBusy} onClick={() => void download("draft")}>导出待校对稿</Button>
             <Button data-testid="export-final" type="primary" disabled={pending > 0 || busy || editing !== null || templateBusy} onClick={() => void download("final")}>导出正式结果</Button>

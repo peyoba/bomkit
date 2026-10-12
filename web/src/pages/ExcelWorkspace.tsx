@@ -6,8 +6,9 @@ import { OutputExample } from "../components/OutputExample";
 import { detectReviewInput } from "../lib/reviewInput";
 import { getWorkerClient } from "../workers/singleton";
 import { useWorkerStore } from "../stores/workerStore";
+import { useSessionStore } from "../stores/sessionStore";
 import type { ExcelArgs, ExcelResult } from "../types/excel";
-import type { LoadedTable, Platform } from "../types/review";
+import type { Platform } from "../types/review";
 
 const metaFields: Array<[keyof ExcelArgs["meta"], string]> = [
   ["pcba_name", "PCBA名称"], ["pcba_model", "PCBA型号"],
@@ -15,14 +16,13 @@ const metaFields: Array<[keyof ExcelArgs["meta"], string]> = [
 ];
 
 export function ExcelWorkspace({onActivityChange}: {onActivityChange?: (busy: boolean) => void}) {
-  const [bom, setBom] = useState<LoadedTable | null>(null);
-  const [material, setMaterial] = useState<LoadedTable | null>(null);
-  const [bomReading, setBomReading] = useState(false);
-  const [materialReading, setMaterialReading] = useState(false);
-  const [platform, setPlatform] = useState<Platform>("auto");
-  const [meta, setMeta] = useState<ExcelArgs["meta"]>({pcba_name: "", pcba_model: "", pcb_name: "", pcb_model: ""});
-  const [filename, setFilename] = useState("");
-  const [trace, setTrace] = useState(true);
+  // 文件与表单草稿放在共享 store：切到网页校对再回来不需要重新上传。
+  const {
+    bom, material, bomFile, materialFile, bomReading, materialReading, platform,
+    excelMeta: meta, excelFilename: filename, excelTrace: trace,
+    setBom, setMaterial, setBomFile, setMaterialFile, setBomReading, setMaterialReading, setPlatform,
+    setExcelMeta, setExcelFilename, setExcelTrace,
+  } = useSessionStore();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ExcelResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -93,8 +93,8 @@ export function ExcelWorkspace({onActivityChange}: {onActivityChange?: (busy: bo
               </div>
               <div className="e-block-body">
                 <div className="e-field-grid">
-                  <LocalTableInput label="BOM 文件" id="bom-file" value={bom} appearance="e" onChange={v => {setBom(v); setResult(null); setError(null);}} onLoading={setBomReading} disabled={busy} />
-                  <LocalTableInput label="物料库文件" id="material-file" value={material} appearance="e" optional onChange={v => {setMaterial(v); setResult(null); setError(null);}} onLoading={setMaterialReading} disabled={busy} />
+                  <LocalTableInput label="BOM 文件" id="bom-file" value={bom} file={bomFile} onFileChange={setBomFile} appearance="e" onChange={v => {setBom(v); setResult(null); setError(null);}} onLoading={setBomReading} disabled={busy} />
+                  <LocalTableInput label="物料库文件" id="material-file" value={material} file={materialFile} onFileChange={setMaterialFile} appearance="e" optional onChange={v => {setMaterial(v); setResult(null); setError(null);}} onLoading={setMaterialReading} disabled={busy} />
                 </div>
                 {format && <p className="e-detected" role="status"><span className="e-mark">OK</span>识别为 {format.name}，表头第 {format.header_row_index + 1} 行</p>}
                 {bom && !format && <p className="e-file-help is-error" role="alert">未识别到已支持格式，请检查所选平台或工作表。</p>}
@@ -113,7 +113,7 @@ export function ExcelWorkspace({onActivityChange}: {onActivityChange?: (busy: bo
                 <div className="e-field-grid cols-4">{metaFields.map(([key, label]) => <div key={key}>
                   <label className="e-field-label" htmlFor={key}>{label}</label>
                   <input className="e-input" id={key} aria-label={label} value={meta[key]} disabled={busy}
-                    autoComplete="off" maxLength={32767} placeholder="选填" onChange={e => {setMeta({...meta, [key]: e.target.value}); setResult(null);}} />
+                    autoComplete="off" maxLength={32767} placeholder="选填" onChange={e => {setExcelMeta({...meta, [key]: e.target.value}); setResult(null);}} />
                 </div>)}</div>
                 <div className="e-row-pair">
                   <div>
@@ -121,12 +121,12 @@ export function ExcelWorkspace({onActivityChange}: {onActivityChange?: (busy: bo
                     <div className="e-filename">
                       <input className="e-input" id="output-name" aria-label="输出文件名" value={filename} disabled={busy}
                         placeholder={bom ? bom.file_name.replace(/\.[^.]+$/, "") + "_converted" : "留空按输入文件名自动生成"}
-                        autoComplete="off" onChange={e => setFilename(e.target.value)} />
+                        autoComplete="off" onChange={e => setExcelFilename(e.target.value)} />
                       {!/\.xlsx$/i.test(filename.trim()) && <span className="e-filename-suffix" aria-hidden="true">.xlsx</span>}
                     </div>
                   </div>
                   <label className="e-checkbox-line"><input type="checkbox" data-testid="excel-trace" checked={trace} disabled={busy}
-                    onChange={e => {setTrace(e.target.checked); setResult(null);}} />
+                    onChange={e => {setExcelTrace(e.target.checked); setResult(null);}} />
                     <span>附原始输入与校对提示</span><span className="e-optional">可选</span>
                   </label>
                 </div>

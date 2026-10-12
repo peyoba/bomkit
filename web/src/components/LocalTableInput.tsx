@@ -20,10 +20,16 @@ interface LocalTableInputProps {
   /** 文件格左侧的等宽短标签，如 BOM / 库 / 模板。 */
   tag?: string;
   compact?: boolean;
+  /** 受控的原始 File，由上层共享 store 持有；省略时退回组件内部状态。 */
+  file?: File | null;
+  onFileChange?: (file: File | null) => void;
 }
 
-export function LocalTableInput({label, id, value, onChange, onLoading, disabled, appearance = "default", optional = false, tag, compact = false}: LocalTableInputProps) {
-  const [file, setFile] = useState<File | null>(null);
+export function LocalTableInput({label, id, value, onChange, onLoading, disabled, appearance = "default", optional = false, tag, compact = false, file: controlledFile, onFileChange}: LocalTableInputProps) {
+  // File 无法从 LoadedTable 还原；由 store 受控后，跨入口切换仍能继续换工作表。
+  const [innerFile, setInnerFile] = useState<File | null>(null);
+  const file = controlledFile === undefined ? innerFile : controlledFile;
+  const setFile = (next: File | null) => { setInnerFile(next); onFileChange?.(next); };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const read = async (f: File, sheet?: string) => {

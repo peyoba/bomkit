@@ -85,6 +85,17 @@ try{
   assert.equal(main.F5.v,5000);assert.equal(main.E5.v.split(',').length,5000);assert.ok(main.E5.v.endsWith('R5000'));
   assert.ok((await id('excel-stats').innerText()).includes('合并为 1 组'));
   report.cases.push({name:'large-5000',passed:true,sourceRows:5000,groups:1,quantity:5000,confirmationClicks:0});
+  // 切换入口不得要求重新上传：同一会话里 BOM 与物料表都要保留。
+  await page.getByRole('button',{name:'网页校对（可选）',exact:true}).click();
+  await id('start-review').waitFor();
+  const reviewText=await page.locator('main').innerText();
+  assert.ok(reviewText.includes('large.xlsx'),'切到网页校对后BOM文件应保留');
+  assert.ok(reviewText.includes('large-material.xlsx'),'切到网页校对后物料表应保留');
+  await page.getByRole('button',{name:'Excel 转换',exact:true}).click();
+  await id('excel-convert').waitFor();
+  const backText=await page.locator('main').innerText();
+  assert.ok(backText.includes('large.xlsx')&&backText.includes('large-material.xlsx'),'切回Excel后文件应保留');
+  report.cases.push({name:'mode-switch-keeps-inputs',passed:true,reuploadRequired:false});
   await page.locator('#bom-file').setInputFiles({name:'broken.xlsx',mimeType:'application/octet-stream',buffer:Buffer.from('broken')});
   await page.getByText('不是有效的 XLSX 文件',{exact:true}).waitFor();
   assert.equal(await id('excel-convert').isDisabled(),true);
