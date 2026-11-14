@@ -5,19 +5,19 @@ import { detectReviewInput } from "../reviewInput";
 
 vi.mock("../../pages/ExcelWorkspace", () => ({ExcelWorkspace: () => <div data-testid="excel-page">Excel</div>}));
 vi.mock("../../pages/ReviewWorkspace", () => ({ReviewWorkspace: () => <div data-testid="review-page">Review</div>}));
-afterEach(cleanup);
+afterEach(() => {cleanup(); window.history.replaceState(null, "", "/");});
 
 describe("Excel优先入口", () => {
-  it("开始转换进入Excel模式，而非强制校对页", () => {
+  it("开始转换进入Excel模式，而非强制校对页", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", {name: "开始转换"}));
-    expect(screen.queryByTestId("excel-page")).not.toBeNull();
+    expect(await screen.findByTestId("excel-page")).not.toBeNull();
     expect(screen.queryByTestId("review-page")).toBeNull();
   });
-  it("网页校对仍是独立可选入口", () => {
+  it("网页校对仍是独立可选入口", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", {name: "网页校对（可选）"}));
-    expect(screen.queryByTestId("review-page")).not.toBeNull();
+    expect(await screen.findByTestId("review-page")).not.toBeNull();
     expect(screen.queryByTestId("excel-page")).toBeNull();
   });
   it("支持旧公司合法的无Device列输入", () => {

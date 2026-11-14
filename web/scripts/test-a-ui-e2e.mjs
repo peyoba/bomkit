@@ -96,7 +96,7 @@ try{
   await page.screenshot({path:path.join(output,'error-desktop.png'),fullPage:true});
   report.cases.push({name:'inline-file-error-no-unsafe-download',passed:true});
   await page.getByRole('button',{name:'网页校对（可选）',exact:true}).click();await id('start-review').waitFor();
-  await page.getByRole('button',{name:'bomkit 首页',exact:true}).click();await page.getByRole('button',{name:'开始转换',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Aistone 工具箱首页',exact:true}).click();await page.getByRole('button',{name:'开始转换',exact:true}).waitFor();
   report.cases.push({name:'optional-review-and-home-retained',passed:true});
   assert.deepEqual(report.errors,[]);assert.deepEqual(report.external,[]);assert.deepEqual(report.uploads,[]);
   report.passed=true;console.log('E UI passed:',report.cases.length,'flows,',report.layouts.length,'layout checks');
