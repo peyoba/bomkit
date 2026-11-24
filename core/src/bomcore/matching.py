@@ -114,7 +114,7 @@ def param_fallback_search(
     each containing rc_type/rc_value/rc_package/rc_tolerance plus code/name/spec.
     Returns list of matching entries (may be empty).
     """
-    bom_type, bom_value = parse_bom_rc_value(name)
+    bom_type, bom_value = parse_bom_rc_value(name, footprint)
     if bom_type is None:
         return []
 

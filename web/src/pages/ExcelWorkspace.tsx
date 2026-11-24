@@ -18,9 +18,12 @@ const metaFields: Array<[keyof ExcelArgs["meta"], string]> = [
 export function ExcelWorkspace({onActivityChange}: {onActivityChange?: (busy: boolean) => void}) {
   // 文件与表单草稿放在共享 store：切到网页校对再回来不需要重新上传。
   const {
-    bom, material, bomFile, materialFile, bomReading, materialReading, platform,
+    bom, material, previous, reference, bomFile, materialFile, previousFile, referenceFile,
+    bomReading, materialReading, previousReading, referenceReading, platform,
     excelMeta: meta, excelFilename: filename, excelTrace: trace,
-    setBom, setMaterial, setBomFile, setMaterialFile, setBomReading, setMaterialReading, setPlatform,
+    setBom, setMaterial, setPrevious, setReference,
+    setBomFile, setMaterialFile, setPreviousFile, setReferenceFile,
+    setBomReading, setMaterialReading, setPreviousReading, setReferenceReading, setPlatform,
     setExcelMeta, setExcelFilename, setExcelTrace,
   } = useSessionStore();
   const [busy, setBusy] = useState(false);
@@ -28,21 +31,25 @@ export function ExcelWorkspace({onActivityChange}: {onActivityChange?: (busy: bo
   const [error, setError] = useState<string | null>(null);
   const engine = useWorkerStore();
   useEffect(() => {getWorkerClient();}, []);
+  const reading = bomReading || materialReading || previousReading || referenceReading;
   useEffect(() => {
-    onActivityChange?.(busy || bomReading || materialReading);
+    onActivityChange?.(busy || reading);
     return () => onActivityChange?.(false);
-  }, [busy, bomReading, materialReading, onActivityChange]);
+  }, [busy, reading, onActivityChange]);
   const format = useMemo(() => {
     if (!bom) return null;
     try {return detectReviewInput(bom.rows, platform);} catch {return null;}
   }, [bom, platform]);
   const ready = engine.mode === "pyodide" && engine.status === "ready";
-  const blocked = !bom || !format || !ready || bomReading || materialReading || busy;
+  const blocked = !bom || !format || !ready || reading || busy;
   async function convert() {
     if (!bom || !format || blocked) return;
     setBusy(true); setError(null); setResult(null);
     try {
       const converted = await getWorkerClient().excel({bom_rows: bom.rows, material_rows: material?.rows ?? null,
+        previous_rows: previous?.rows ?? null,
+        reference_rows: reference ? [reference.rows] : [],
+        sort_mode: "auto",
         platform, meta, include_trace: trace});
       const bytes = new Uint8Array(converted.data);
       const url = URL.createObjectURL(new Blob([bytes], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
@@ -95,10 +102,12 @@ export function ExcelWorkspace({onActivityChange}: {onActivityChange?: (busy: bo
                 <div className="e-field-grid">
                   <LocalTableInput label="BOM 文件" id="bom-file" value={bom} file={bomFile} onFileChange={setBomFile} appearance="e" onChange={v => {setBom(v); setResult(null); setError(null);}} onLoading={setBomReading} disabled={busy} />
                   <LocalTableInput label="物料库文件" id="material-file" value={material} file={materialFile} onFileChange={setMaterialFile} appearance="e" optional onChange={v => {setMaterial(v); setResult(null); setError(null);}} onLoading={setMaterialReading} disabled={busy} />
+                  <LocalTableInput label="上一版成品 BOM" id="previous-file" tag="旧" value={previous} file={previousFile} onFileChange={setPreviousFile} appearance="e" optional onChange={v => {setPrevious(v); setResult(null); setError(null);}} onLoading={setPreviousReading} disabled={busy} />
+                  <LocalTableInput label="物料参考表" id="reference-file" tag="参" value={reference} file={referenceFile} onFileChange={setReferenceFile} appearance="e" optional onChange={v => {setReference(v); setResult(null); setError(null);}} onLoading={setReferenceReading} disabled={busy} />
                 </div>
                 {format && <p className="e-detected" role="status"><span className="e-mark">OK</span>识别为 {format.name}，表头第 {format.header_row_index + 1} 行</p>}
                 {bom && !format && <p className="e-file-help is-error" role="alert">未识别到已支持格式，请检查所选平台或工作表。</p>}
-                <p className="e-block-note">保留原有分组合并、排序与多候选展开。物料表支持金蝶完整与旧简易格式。</p>
+                <p className="e-block-note">保留原有分组合并、排序与多候选展开。物料表支持金蝶完整与旧简易格式；给了上一版 BOM 或物料参考表时，按公司规则输出（继承编码、按类别排序、备注标匹配方式、末尾列原始型号）。</p>
               </div>
             </section>
 
@@ -153,6 +162,7 @@ export function ExcelWorkspace({onActivityChange}: {onActivityChange?: (busy: bo
             <div className="e-block-body">
               <p className="e-block-note" data-testid="excel-stats">原始 <span className="e-mono">{result.stats.source_rows}</span> 行 / <span className="e-mono">{result.stats.quantity}</span> 件 → 按旧规则合并为 <span className="e-mono">{result.stats.groups}</span> 组 → 输出 <span className="e-mono">{result.stats.output_rows}</span> 行元件明细（另含 PCB 空板行）。</p>
               <p className="e-block-note">{result.material_format} · <span className="e-mono">{result.stats.material_count}</span> 条可匹配记录 · 多候选 <span className="e-mono">{result.stats.multi}</span> 组 · 未匹配 <span className="e-mono">{result.stats.unmatched}</span> 组 · 非物料 <span className="e-mono">{result.stats.non_component}</span> 组。</p>
+              {(result.stats.previous ?? 0) + (result.stats.reference ?? 0) > 0 && <p className="e-block-note" data-testid="excel-lineage">谱系匹配：上一版继承 <span className="e-mono">{result.stats.previous ?? 0}</span> 项 · 参考表命中 <span className="e-mono">{result.stats.reference ?? 0}</span> 项。</p>}
               {result.stats.multi > 0 && <div className="e-alert is-warning"><span className="e-mark">!</span><div>
                 <p className="e-alert-title">候选仍需在 Excel 中删选</p>
                 <p className="e-alert-body">表格展示数量合计 {result.stats.display_quantity}，包含候选重复展示；源 BOM 数量为 {result.stats.quantity}。请删去多余候选后再核对，不能直接把展示合计用于采购。</p>

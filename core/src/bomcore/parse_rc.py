@@ -145,7 +145,7 @@ def parse_capacitor_pf(seg: str) -> float | None:
     return None
 
 
-def parse_bom_rc_value(name: str) -> tuple[str | None, float | None]:
+def parse_bom_rc_value(name: str, footprint: str | None = None) -> tuple[str | None, float | None]:
     """Parse R/C value from BOM Name field (e.g. '10kΩ' -> ('R', 10000) / '100nF' -> ('C', 100000)).
 
     Intentionally conservative: the BOM 'Name' field can also hold arbitrary
@@ -174,6 +174,13 @@ def parse_bom_rc_value(name: str) -> tuple[str | None, float | None]:
         num = float(m.group(1))
         mult = C_UNIT_MULT.get(m.group(2)) or C_UNIT_MULT[m.group(2).lower()]
         return "C", num * mult
+
+    # 裸数值（嘉立创/立创EDA 常导出 '499'、'1k'，没有单位）：只有封装明确以 R 开头
+    # 才按电阻解析，避免把 '100' 这类无单位数字误判成电容值。
+    if footprint and re.match(r"^R\s*\d{4}", footprint.strip(), re.IGNORECASE):
+        m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*([kKmMrR]?)", cleaned)
+        if m:
+            return "R", float(m.group(1)) * R_MULT.get(m.group(2) or "", 1)
 
     return None, None
 

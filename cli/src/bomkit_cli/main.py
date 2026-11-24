@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 from bomcore.excel_api import convert_excel
+from bomcore.lineage import load_lineage
 from bomcore.review_import import read_file
 from bomcore.schema import ProfileError
 
@@ -18,6 +19,24 @@ from bomcore.schema import ProfileError
 def _read_xlsx_as_rows(path: str) -> list[list[str]]:
     """兼容保留旧内部读取函数名，统一采用可靠的本机读取器。"""
     return read_file(path)["rows"]
+
+
+def read_lineage_file(path: str, label: str) -> list[list[str]]:
+    """读取成品 PCBA BOM（上一版 / 物料参考表）：逐工作表找含 物料编码/规格型号/位号 的那一张。"""
+    from openpyxl import load_workbook
+
+    try:
+        names = load_workbook(path, read_only=True).sheetnames
+    except Exception as exc:  # noqa: BLE001 -- 统一转为用户可读错误
+        raise ProfileError("INVALID_ROWS", f"{label}无法读取，请确认是 .xlsx 文件") from exc
+    for name in names:
+        rows = read_file(path, name)["rows"]
+        if load_lineage(rows):
+            return rows
+    raise ProfileError(
+        "INVALID_PROFILE",
+        f"{label}不是成品 PCBA BOM：需要含 物料编码 / 规格型号 / 位号 表头（请确认选对文件或工作表）",
+    )
 
 
 def _save_with_retry(path: str, data: bytes) -> None:
@@ -109,6 +128,26 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="附原始输入和Excel校对提示，不改变公司主表",
     )
+    parser.add_argument(
+        "--old",
+        dest="previous_file",
+        default=None,
+        help="上一版成品 BOM（可选）：按位号继承编码，并作为排序与 PCBA 名称/型号来源",
+    )
+    parser.add_argument(
+        "--ref",
+        dest="reference_files",
+        action="append",
+        default=None,
+        help="物料参考表（可选，可重复）：已有成品 BOM，按型号/阻容参数直接查编码",
+    )
+    parser.add_argument(
+        "--sort",
+        dest="sort_mode",
+        choices=["auto", "legacy", "company"],
+        default="auto",
+        help="排序：auto=给了 --old/--ref 时用公司规则 v2；legacy=旧工具排序；company=强制 v2",
+    )
     return parser
 
 
@@ -125,6 +164,19 @@ def main(argv: list[str] | None = None) -> int:
             if args.material_code_file
             else None
         )
+        previous_rows = (
+            read_lineage_file(args.previous_file, "上一版 BOM") if args.previous_file else None
+        )
+        reference_rows = [
+            read_lineage_file(path, f"物料参考表{i + 1}")
+            for i, path in enumerate(args.reference_files or [])
+        ]
+        if args.sort_mode == "legacy" and (previous_rows is not None or reference_rows):
+            sort_mode = "legacy"
+        elif args.sort_mode == "company":
+            sort_mode = "company"
+        else:
+            sort_mode = "auto"
         result = convert_excel(
             {
                 "bom_rows": bom_rows,
@@ -137,6 +189,11 @@ def main(argv: list[str] | None = None) -> int:
                     "pcb_model": args.pcb_model,
                 },
                 "include_trace": args.with_trace,
+                "previous_rows": previous_rows,
+                "reference_rows": reference_rows,
+                "sort_mode": "company" if sort_mode == "company" or (
+                    sort_mode == "auto" and (previous_rows is not None or reference_rows)
+                ) else "legacy",
             }
         )
         _save_with_retry(output_file, result["data"])
@@ -147,7 +204,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"错误: {exc}")
         return 1
 
-    print(f"转换完成！输出文件: {output_file}")
+    stats = result["stats"]
+    print(
+        f"转换完成！输出文件: {output_file}\n"
+        f"  原始 {stats['source_rows']} 行 / {stats['quantity']} 件 → {stats['groups']} 组 → "
+        f"输出 {stats['output_rows']} 行；多候选 {stats['multi']} 组，未匹配 {stats['unmatched']} 组"
+    )
+    if previous_rows is not None or reference_rows:
+        print(
+            f"  谱系匹配：上一版继承 {stats.get('previous', 0)} 项，参考表命中 {stats.get('reference', 0)} 项；"
+            f"物料表 {result['material_format']}"
+        )
     return 0
 
 

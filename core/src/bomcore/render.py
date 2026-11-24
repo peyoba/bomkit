@@ -208,11 +208,13 @@ def _write_builtin_header(ws, profile: dict, meta: dict, total_cols: int, has_ma
         ws.cell(row=2, column=col).border = thin_border
 
     standard_headers = ["序号", "物料编码", "物料名称", "规格型号（金蝶）",
-                         "位号", "数量", "封装", "厂商", "备注"]
+                        "位号", "数量", "封装", "厂商", "备注"]
     aux_headers = ["JLC规格", "Description"]
     if has_material:
         aux_headers.append("匹配状态")
-    headers = standard_headers + aux_headers
+    # 调用方可通过 profile["headers"] / profile["column_widths"] 覆盖内置表头与列宽
+    # （契约 v1.1 附录 A.2：公司规则 v2 模板追加"原始BOM型号"等列），需与 columns 一一对应。
+    headers = profile.get("headers") or (standard_headers + aux_headers)
     aux_header_fill = PatternFill(start_color="DAEEF3", end_color="DAEEF3", fill_type="solid")
     for col_idx, header in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col_idx)
