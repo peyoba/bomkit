@@ -17,6 +17,10 @@ interface LocalTableInputProps {
   /** "e"：方向 E 文件格；"default"：旧版裸输入，仅供未接入新样式的页面使用。 */
   appearance?: "default" | "e";
   optional?: boolean;
+  /** 空态占位文字；缺省按 optional 选"物料表 / BOM 文件"。 */
+  placeholder?: string;
+  /** 空态说明文字；缺省 optional 用"金蝶完整 / 旧简易格式"。 */
+  hint?: string;
   /** 文件格左侧的等宽短标签，如 BOM / 库 / 模板。 */
   tag?: string;
   compact?: boolean;
@@ -25,7 +29,7 @@ interface LocalTableInputProps {
   onFileChange?: (file: File | null) => void;
 }
 
-export function LocalTableInput({label, id, value, onChange, onLoading, disabled, appearance = "default", optional = false, tag, compact = false, file: controlledFile, onFileChange}: LocalTableInputProps) {
+export function LocalTableInput({label, id, value, onChange, onLoading, disabled, appearance = "default", optional = false, placeholder: placeholderText, hint, tag, compact = false, file: controlledFile, onFileChange}: LocalTableInputProps) {
   // File 无法从 LoadedTable 还原；由 store 受控后，跨入口切换仍能继续换工作表。
   const [innerFile, setInnerFile] = useState<File | null>(null);
   const file = controlledFile === undefined ? innerFile : controlledFile;
@@ -55,7 +59,8 @@ export function LocalTableInput({label, id, value, onChange, onLoading, disabled
 
   if (appearance === "e") {
     const state = (loading ? " is-loading" : "") + (disabled ? " is-disabled" : "") + (error ? " is-error" : "") + (value ? " has-file" : " is-empty") + (compact ? " is-compact" : "");
-    const placeholder = "选择" + (optional ? "物料表" : "BOM 文件");
+    const placeholder = placeholderText ?? ("选择" + (optional ? "物料表" : "BOM 文件"));
+    const emptyHint = hint ?? (optional ? "金蝶完整 / 旧简易格式" : "XLSX · TXT · TSV · CSV");
     return <div className="e-file-field">
       <label className="e-field-label" htmlFor={id}>{label}{optional && <span className="e-optional">可选</span>}</label>
       <div className={"e-file-cell" + state}>
@@ -66,7 +71,7 @@ export function LocalTableInput({label, id, value, onChange, onLoading, disabled
             <span className={"e-file-name" + (value || error ? "" : " is-placeholder")} title={value?.file_name || file?.name}>
               {loading ? "正在读取本地文件…" : value?.file_name || (error ? file?.name : placeholder)}
             </span>
-            <span className="e-file-meta">{value ? value.rows.length + " 行（含表头）" + (value.encoding ? " · " + value.encoding : "") : optional ? "金蝶完整 / 旧简易格式" : "XLSX · TXT · TSV · CSV"}</span>
+            <span className="e-file-meta">{value ? value.rows.length + " 行（含表头）" + (value.encoding ? " · " + value.encoding : "") : emptyHint}</span>
           </span>
           <span className="e-file-act">{loading ? "读取中" : value || error ? "更换" : "选择"}</span>
         </div>
