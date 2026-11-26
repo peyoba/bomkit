@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src 'none'; script-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <title>bomkit · 方向 A · 浅色专业静态效果图</title>
+  <!--
+    方向 A：浅色专业。静态效果图，不接业务逻辑。
+    huashu-design Phase 4 独立候选；尚未获用户选定，不是可用业务系统。
+    唯一内容依据：共同 design-brief.md；文件名、物料和型号均为合成示例。
+    构图来自“导入 BOM → 按既有 PCBA 模板导出 Excel”：左侧输入，右侧输出样式示意。
+    横向导航、线分隔表单、白色与浅冷灰、钴蓝主操作；不用照片或外部资源。
+    文件选择、导航、生成按钮均为静态呈现；没有读取文件、处理、下载或后台调用。
+    原生文本输入和复选框只保留自然焦点、悬停及编辑，不产生业务结果。
+    右侧仅演示主表局部的信息层级，不定义或更改真实 Excel 的完整字段与原主表格式。
+    画布 1440 × 960；正文至少 14px，辅助标签至少 12px；全部 CSS 与线型 SVG 内嵌。
+  -->
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #ffffff;
+      --ink: #1b2839;
+      --secondary: #536175;
+      --muted: #637085;
+      --line: #dce2ea;
+      --blue: #2852c4;
+      --blue-ink: #224cae;
+      --cool: #f1f4f8;
+      --blue-wash: #edf2fc;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--paper); }
+    body {
+      margin: 0;
+      min-width: 1440px;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Avenir Next", "PingFang SC", "Hiragino Sans GB", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      font-variant-numeric: tabular-nums;
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button, input { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, input:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 4px;
+    }
+    button { color: inherit; }
+    svg { display: block; flex-shrink: 0; }
+    h1, h2, h3, p { margin: 0; }
+    .wrap { width: 1320px; margin: 0 auto; }
+    .topbar { height: 80px; border-bottom: 1px solid var(--line); }
+    .topbar-inner { display: flex; align-items: center; height: 100%; }
+    .brand {
+      font-size: 29px;
+      font-weight: 700;
+      letter-spacing: -1.3px;
+      line-height: 1.3;
+    }
+    .brand-caption {
+      margin-left: 22px;
+      padding-left: 22px;
+      border-left: 1px solid var(--line);
+      color: var(--secondary);
+      font-size: 13px;
+      letter-spacing: .25px;
+    }
+    .navigation { display: flex; gap: 30px; align-self: stretch; margin-left: 68px; }
+    .nav-item {
+      position: relative;
+      padding: 0 2px;
+      border: 0;
+      background: none;
+      font-size: 15px;
+      color: var(--secondary);
+    }
+    .nav-item[aria-current="page"] { color: var(--blue-ink); font-weight: 600; }
+    .nav-item[aria-current="page"]::after {
+      content: "";
+      position: absolute;
+      right: 0;
+      bottom: -1px;
+      left: 0;
+      height: 3px;
+      background: var(--blue);
+    }
+    .nav-item:hover { color: var(--blue-ink); }
+    .nav-optional { margin-left: 5px; font-size: 12px; color: var(--muted); }
+    .local-note { display: flex; align-items: center; gap: 9px; margin-left: auto; color: var(--secondary); font-size: 13px; }
+    .intro { display: flex; align-items: flex-end; justify-content: space-between; padding-top: 28px; margin-bottom: 24px; }
+    .eyebrow { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 1.6px; line-height: 18px; margin-bottom: 8px; }
+    h1 { font-size: 32px; line-height: 1.3; font-weight: 600; letter-spacing: -1px; }
+    .intro-copy { color: var(--secondary); font-size: 15px; margin-top: 9px; }
+    .intro-meta { text-align: right; padding-bottom: 3px; }
+    .intro-meta p { font-size: 14px; color: var(--secondary); }
+    .intro-meta .meta-label { color: var(--muted); font-size: 12px; margin-bottom: 5px; }
+    .workbench { display: grid; grid-template-columns: 772px 504px; gap: 44px; align-items: stretch; }
+    .form-pane { padding-top: 1px; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; min-height: 25px; margin-bottom: 15px; }
+    h2 { font-size: 18px; font-weight: 600; letter-spacing: -.25px; line-height: 25px; }
+    .section-helper { color: var(--muted); font-size: 12px; }
+    .file-grid, .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .field-label { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; font-size: 14px; line-height: 21px; font-weight: 500; }
+    .optional { font-size: 12px; color: var(--muted); font-weight: 400; }
+    .file-control {
+      width: 100%;
+      height: 83px;
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      text-align: left;
+      background: white;
+      border: 1px solid #cad3e0;
+      border-radius: 5px;
+      padding: 14px 16px;
+    }
+    .file-control:hover { border-color: #8298c4; background: #fbfcff; }
+    .file-icon { width: 28px; height: 34px; color: #4c638a; }
+    .file-name { display: block; font-size: 15px; font-weight: 600; letter-spacing: -.25px; }
+    .file-meta { display: block; color: var(--muted); font-size: 12px; font-weight: 400; margin-top: 3px; }
+    .file-change { margin-left: auto; font-size: 13px; font-weight: 500; color: var(--blue-ink); white-space: nowrap; }
+    .file-hint { margin-top: 10px; color: var(--secondary); font-size: 14px; line-height: 22px; }
+    .information { margin-top: 21px; padding-top: 20px; border-top: 1px solid var(--line); }
+    .info-grid { row-gap: 13px; }
+    .text-input {
+      display: block;
+      width: 100%;
+      height: 42px;
+      padding: 9px 12px;
+      color: var(--ink);
+      border: 1px solid #cad3e0;
+      border-radius: 4px;
+      background: #fff;
+      font-size: 14px;
+      line-height: 22px;
+    }
+    .text-input:hover { border-color: #9aaac1; }
+    .text-input:focus { border-color: var(--blue); }
+    .export-settings { margin-top: 21px; padding-top: 20px; border-top: 1px solid var(--line); }
+    .filename-field { display: flex; align-items: center; }
+    .filename-field input { border-radius: 4px 0 0 4px; }
+    .filename-suffix {
+      display: flex; align-items: center; justify-content: center;
+      height: 42px; width: 69px; flex-shrink: 0;
+      border: 1px solid #cad3e0; border-left: 0;
+      border-radius: 0 4px 4px 0;
+      color: var(--secondary); background: #f7f9fc;
+      font-size: 14px;
+    }
+    .checkbox-line { display: flex; align-items: center; gap: 9px; margin-top: 13px; font-size: 14px; line-height: 22px; }
+    .checkbox-line input { width: 16px; height: 16px; margin: 0; accent-color: var(--blue); }
+    .action-row { display: flex; align-items: center; justify-content: space-between; margin-top: 23px; }
+    .action-title { font-size: 15px; font-weight: 500; line-height: 24px; }
+    .action-detail { font-size: 12px; color: var(--muted); line-height: 18px; margin-top: 2px; }
+    .generate {
+      display: flex; align-items: center; justify-content: center; gap: 13px;
+      width: 225px; height: 50px; padding: 0 24px;
+      border: 1px solid var(--blue); border-radius: 5px;
+      background: var(--blue); color: #fff;
+      font-size: 16px; font-weight: 600; letter-spacing: .1px;
+    }
+    .generate:hover { background: #2046ae; border-color: #2046ae; }
+    .preview-pane {
+      display: flex; flex-direction: column;
+      padding: 24px 24px 22px;
+      background: var(--cool);
+      border: 1px solid #e3e8ef;
+      border-radius: 6px;
+    }
+    .preview-heading { display: flex; align-items: center; justify-content: space-between; }
+    .preview-heading h2 { font-size: 18px; }
+    .format-badge { font-size: 12px; font-weight: 600; letter-spacing: .7px; color: var(--secondary); }
+    .preview-caption { font-size: 14px; color: var(--secondary); margin-top: 5px; }
+    .worksheet {
+      margin-top: 17px;
+      background: white;
+      border: 1px solid #cfd7e3;
+      box-shadow: 0 5px 14px rgba(32, 50, 83, .045);
+    }
+    .sheet-bar { display: flex; align-items: center; justify-content: space-between; padding: 9px 15px; border-bottom: 1px solid var(--line); background: #fafbfd; color: var(--secondary); }
+    .sheet-bar span { font-size: 12px; }
+    .sheet-bar .sheet-name { font-weight: 500; letter-spacing: .2px; }
+    .sheet-title { padding: 16px 17px 13px; }
+    .sheet-title h3 { font-size: 20px; line-height: 28px; letter-spacing: -.4px; font-weight: 600; }
+    .sheet-title p { margin-top: 6px; color: var(--secondary); font-size: 14px; line-height: 21px; }
+    table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    col.index { width: 36px; }
+    col.ref { width: 75px; }
+    col.quantity { width: 54px; }
+    th { background: #f5f7fa; font-size: 12px; font-weight: 500; color: var(--secondary); text-align: left; padding: 8px 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th:first-child { text-align: center; padding-left: 5px; padding-right: 5px; }
+    td { font-size: 14px; line-height: 21px; height: 37px; padding: 7px 10px; border-bottom: 1px solid #e5eaf1; white-space: nowrap; }
+    th + th, td + td { border-left: 1px solid #e5eaf1; }
+    .row-index { text-align: center; font-size: 12px; color: var(--muted); padding-left: 5px; padding-right: 5px; background: #fafbfd; }
+    .quantity-cell { text-align: right; font-family: "DIN Alternate", "Avenir Next", sans-serif; font-size: 16px; padding-right: 16px; }
+    .candidate td:not(.row-index) { background: #f0f4fd; }
+    .candidate-token { color: var(--blue-ink); font-size: 12px; margin-right: 8px; font-weight: 500; }
+    .sheet-bottom { display: flex; align-items: center; height: 35px; background: #fafbfd; padding-left: 14px; }
+    .sheet-tab { padding: 7px 12px 6px; align-self: stretch; font-size: 12px; border-bottom: 2px solid var(--blue); color: var(--blue-ink); font-weight: 500; background: white; }
+    .sheet-bottom .sample-note { margin-left: auto; padding-right: 14px; color: var(--muted); font-size: 12px; }
+    .template-note { margin-top: 13px; color: var(--secondary); font-size: 14px; line-height: 22px; }
+    .processing-note { margin-top: auto; padding-top: 14px; }
+    .processing-inner { padding-top: 14px; border-top: 1px solid #d8e0eb; }
+    .processing-inner h3 { font-size: 14px; line-height: 22px; font-weight: 600; }
+    .processing-inner p { color: var(--secondary); font-size: 14px; line-height: 22px; margin-top: 4px; }
+    .candidate-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; color: #334d78; }
+    .candidate-note svg { margin-top: 3px; }
+    .candidate-note p { font-size: 14px; line-height: 22px; margin: 0; color: #334d78; }
+    .footer { display: flex; justify-content: space-between; margin-top: 20px; padding-top: 15px; padding-bottom: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 18px; }
+    .footer strong { font-weight: 500; color: var(--secondary); }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <div class="brand">bomkit</div>
+      <div class="brand-caption">BOM → Excel</div>
+      <nav class="navigation" aria-label="工作模式（静态示意）">
+        <button class="nav-item" type="button" aria-current="page">Excel 转换</button>
+        <button class="nav-item" type="button" title="静态效果图，不跳转">网页校对<span class="nav-optional">（可选）</span></button>
+      </nav>
+      <div class="local-note">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></svg>
+        <span>浏览器本地处理</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="intro">
+      <div>
+        <p class="eyebrow">EXCEL CONVERSION</p>
+        <h1>BOM 转换工作台</h1>
+        <p class="intro-copy">导入已有清单，按公司 PCBA 模板输出。</p>
+      </div>
+      <div class="intro-meta">
+        <p class="meta-label">支持已适配的 EDA 格式</p>
+        <p>嘉立创<span aria-hidden="true"> / </span>Altium<span aria-hidden="true"> / </span>Cadence</p>
+      </div>
+    </div>
+
+    <div class="workbench">
+      <section class="form-pane" aria-label="Excel 转换设置（静态效果图）">
+        <section aria-labelledby="files-heading">
+          <div class="section-head">
+            <h2 id="files-heading">输入文件</h2>
+            <span class="section-helper">EDA 平台自动识别</span>
+          </div>
+          <div class="file-grid">
+            <div>
+              <div class="field-label" id="bom-label">BOM 文件</div>
+              <button type="button" class="file-control" aria-labelledby="bom-label bom-name" title="静态效果图：仅展示示例文件选中状态">
+                <svg class="file-icon" viewBox="0 0 28 34" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h10l7 7v21a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M16 2v8h7M9 16h9M9 21h9M9 26h5"/></svg>
+                <span><span class="file-name" id="bom-name">示例BOM.xlsx</span><span class="file-meta">已选示例文件</span></span>
+                <span class="file-change">更换</span>
+              </button>
+            </div>
+            <div>
+              <div class="field-label" id="materials-label">物料表<span class="optional">可选</span></div>
+              <button type="button" class="file-control" aria-labelledby="materials-label materials-name" title="静态效果图：仅展示示例文件选中状态">
+                <svg class="file-icon" viewBox="0 0 28 34" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h10l7 7v21a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M16 2v8h7M9 16h9v10H9ZM9 21h9M13.5 16v10"/></svg>
+                <span><span class="file-name" id="materials-name">示例物料表.xlsx</span><span class="file-meta">已选示例文件</span></span>
+                <span class="file-change">更换</span>
+              </button>
+            </div>
+          </div>
+          <p class="file-hint">保留原有分组合并、排序与多候选展开。</p>
+        </section>
+
+        <section class="information" aria-labelledby="information-heading">
+          <div class="section-head">
+            <h2 id="information-heading">输出信息</h2>
+            <span class="section-helper">以下四项均为可选</span>
+          </div>
+          <div class="info-grid">
+            <div>
+              <label class="field-label" for="pcba-name">PCBA 名称</label>
+              <input class="text-input" id="pcba-name" type="text" value="示例控制板" autocomplete="off" spellcheck="false">
+            </div>
+            <div>
+              <label class="field-label" for="pcba-model">PCBA 型号</label>
+              <input class="text-input" id="pcba-model" type="text" value="DEMO-PCBA-01" autocomplete="off" spellcheck="false">
+            </div>
+            <div>
+              <label class="field-label" for="pcb-name">PCB 空板名称</label>
+              <input class="text-input" id="pcb-name" type="text" value="示例控制板空板" autocomplete="off" spellcheck="false">
+            </div>
+            <div>
+              <label class="field-label" for="pcb-model">PCB 空板型号</label>
+              <input class="text-input" id="pcb-model" type="text" value="DEMO-PCB-01" autocomplete="off" spellcheck="false">
+            </div>
+          </div>
+        </section>
+
+        <section class="export-settings" aria-label="生成设置">
+          <label class="field-label" for="output-name">输出文件名</label>
+          <div class="filename-field">
+            <input class="text-input" id="output-name" type="text" value="示例控制板_PCBA" aria-describedby="extension" autocomplete="off" spellcheck="false">
+            <span class="filename-suffix" id="extension">.xlsx</span>
+          </div>
+          <label class="checkbox-line" for="include-source">
+            <input id="include-source" type="checkbox" checked>
+            <span>附原始输入与校对提示</span>
+            <span class="optional">可选</span>
+          </label>
+          <div class="action-row">
+            <div>
+              <p class="action-title">在 Excel 中完成校对</p>
+              <p class="action-detail">网页校对为可选入口，不影响直接导出</p>
+            </div>
+            <button class="generate" type="button" title="静态效果图：不处理文件，不生成下载" aria-describedby="static-disclaimer">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v5h14v-5"/></svg>
+              <span>生成 Excel</span>
+            </button>
+          </div>
+        </section>
+      </section>
+
+      <aside class="preview-pane" aria-labelledby="preview-heading">
+        <div class="preview-heading">
+          <h2 id="preview-heading">输出样式示意</h2>
+          <span class="format-badge">XLSX</span>
+        </div>
+        <p class="preview-caption">主表局部 · 合成示例，非实时预览</p>
+
+        <div class="worksheet" aria-label="Excel 主表局部，全部为合成示例数据">
+          <div class="sheet-bar"><span class="sheet-name">公司 PCBA 模板</span><span>示例数据</span></div>
+          <div class="sheet-title">
+            <h3>示例控制板 PCBA</h3>
+            <p>PCBA 型号：DEMO-PCBA-01</p>
+          </div>
+          <table aria-label="主表局部示意，不代表完整输出字段">
+            <colgroup><col class="index"><col class="ref"><col><col class="quantity"></colgroup>
+            <thead><tr><th scope="col">#</th><th scope="col">位号</th><th scope="col">规格 / 型号</th><th scope="col">数量</th></tr></thead>
+            <tbody>
+              <tr><td class="row-index">01</td><td>R1, R2</td><td>10kΩ · 0603</td><td class="quantity-cell">2</td></tr>
+              <tr><td class="row-index">02</td><td>C1, C2</td><td>100nF · 0603</td><td class="quantity-cell">2</td></tr>
+              <tr class="candidate"><td class="row-index">03</td><td>U1</td><td><span class="candidate-token">候选 A</span>DEMO-IC-A</td><td class="quantity-cell">1</td></tr>
+              <tr class="candidate"><td class="row-index">04</td><td>U1</td><td><span class="candidate-token">候选 B</span>DEMO-IC-B</td><td class="quantity-cell">1</td></tr>
+              <tr><td class="row-index">05</td><td>J1</td><td>2×3 · 2.54mm</td><td class="quantity-cell">1</td></tr>
+            </tbody>
+          </table>
+          <div class="sheet-bottom"><span class="sheet-tab">主表（局部）</span><span class="sample-note">样式示意</span></div>
+        </div>
+        <p class="template-note">完整 Excel 字段与原主表格式保持不变。</p>
+
+        <div class="processing-note">
+          <div class="processing-inner">
+            <h3>沿用你熟悉的表格处理方式</h3>
+            <p>分组合并 · 排序 · 多候选展开</p>
+            <div class="candidate-note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.5"/></svg>
+              <p>多候选请在 Excel 中删选，再核对数量。</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <footer class="footer">
+      <span><strong>A / 浅色专业</strong> · 从输入清单到输出表格</span>
+      <span id="static-disclaimer">静态效果图 · 仅含合成示例 · 未连接业务逻辑</span>
+    </footer>
+  </main>
+</body>
+</html>

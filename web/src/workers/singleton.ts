@@ -1,6 +1,5 @@
 ﻿/**
- * Worker 客户端单例。Wizard/Preview 两个页面组件共用同一个 worker 实例
- * （Preview 需要调用 render() 下载文件，Wizard 负责 detect/analyze），
+ * Worker 客户端单例。Excel 转换页与网页校对页共用同一个 worker 实例，
  * 避免各自 useMemo 出两个 Web Worker、重复冷启动加载 Pyodide。
  *
  * ?worker=mock 查询参数强制使用 mock worker（供 Playwright/手工调试），

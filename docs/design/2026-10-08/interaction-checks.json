@@ -1,0 +1,26 @@
+[
+  {
+    "name": "load demo enables conversion",
+    "pass": true
+  },
+  {
+    "name": "conversion remains explicitly simulated",
+    "pass": true
+  },
+  {
+    "name": "pending filter",
+    "pass": true
+  },
+  {
+    "name": "search",
+    "pass": true
+  },
+  {
+    "name": "detail selection",
+    "pass": true
+  },
+  {
+    "name": "empty results",
+    "pass": true
+  }
+]

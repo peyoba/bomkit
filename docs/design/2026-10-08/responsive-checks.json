@@ -1,0 +1,74 @@
+[
+  {
+    "page": "产品首页 · bomkit 原型",
+    "width": 320,
+    "scroll": 305,
+    "pass": true
+  },
+  {
+    "page": "产品首页 · bomkit 原型",
+    "width": 375,
+    "scroll": 360,
+    "pass": true
+  },
+  {
+    "page": "产品首页 · bomkit 原型",
+    "width": 414,
+    "scroll": 399,
+    "pass": true
+  },
+  {
+    "page": "产品首页 · bomkit 原型",
+    "width": 768,
+    "scroll": 753,
+    "pass": true
+  },
+  {
+    "page": "Excel 转换 · bomkit 原型",
+    "width": 320,
+    "scroll": 305,
+    "pass": true
+  },
+  {
+    "page": "Excel 转换 · bomkit 原型",
+    "width": 375,
+    "scroll": 360,
+    "pass": true
+  },
+  {
+    "page": "Excel 转换 · bomkit 原型",
+    "width": 414,
+    "scroll": 399,
+    "pass": true
+  },
+  {
+    "page": "Excel 转换 · bomkit 原型",
+    "width": 768,
+    "scroll": 753,
+    "pass": true
+  },
+  {
+    "page": "网页校对 · bomkit 原型",
+    "width": 320,
+    "scroll": 305,
+    "pass": true
+  },
+  {
+    "page": "网页校对 · bomkit 原型",
+    "width": 375,
+    "scroll": 360,
+    "pass": true
+  },
+  {
+    "page": "网页校对 · bomkit 原型",
+    "width": 414,
+    "scroll": 399,
+    "pass": true
+  },
+  {
+    "page": "网页校对 · bomkit 原型",
+    "width": 768,
+    "scroll": 753,
+    "pass": true
+  }
+]

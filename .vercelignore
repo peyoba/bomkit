@@ -1,0 +1,15 @@
+core/tests/fixtures/private/**
+docs/**/*.xlsx
+docs/**/*.xls
+docs/**/*.rar
+docs/**/*.zip
+docs/bom资料/**
+.venv/**
+.vercel-build/**
+web/node_modules/**
+web/dist/**
+web/public/pyodide/**
+core/dist/**
+core/build/**
+.env*
+*.secret.*

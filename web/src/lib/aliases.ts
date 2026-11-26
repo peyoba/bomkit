@@ -24,8 +24,7 @@ export const ALIASES: Record<string, string[]> = {
 
 /**
  * kind -> 允许映射的字段集合。必须与 core/src/bomcore/schema.py 的
- * BOM_FIELDS / MATERIAL_FIELDS 保持同步，并与 detect.ts 的 kind 过滤、
- * Wizard 页的 *_FIELD_OPTIONS 三方一致。
+ * BOM_FIELDS / MATERIAL_FIELDS 保持同步，并与 detect.ts 的 kind 过滤一致。
  */
 export const KIND_ALLOWED_FIELDS: Record<"bom_input" | "material_input", ReadonlySet<string>> = {
   bom_input: new Set([
