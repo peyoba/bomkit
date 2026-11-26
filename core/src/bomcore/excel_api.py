@@ -11,7 +11,7 @@ from dataclasses import asdict
 from importlib import resources
 
 from openpyxl import load_workbook
-from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 from .grouping import clean_secondary_category, group_and_sort
 from .matching import build_material_rc_index, match_device
@@ -502,7 +502,8 @@ def _company_workbook_v2(items, meta, has_material):
 
 def _write_candidate_zone(ws, row_number: int, candidates: list[dict], total_cols: int) -> int:
     """底部候选区：多候选待拍板 + 未定码行的备选型号，选用后填回主表并删除本区。"""
-    border = ws.cell(5, 1).border
+    border = Border(left=Side(style="thin"), right=Side(style="thin"),
+                    top=Side(style="thin"), bottom=Side(style="thin"))
     ws.merge_cells(start_row=row_number, start_column=1, end_row=row_number, end_column=total_cols)
     title = ws.cell(row_number, 1)
     title.value = ("▼ 候选区：多候选待拍板项，以及未定码项的备选型号（值相同封装不同/近似型号）。"

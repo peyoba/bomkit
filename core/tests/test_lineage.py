@@ -167,3 +167,36 @@ def test_rows_without_lineage_behave_as_before():
     assert all(item["match"].get("source", "") == "" for item in analysis["items"])
     assert analysis["stats"]["previous"] == 0
     assert analysis["stats"]["reference"] == 0
+
+
+MULTI_MATERIAL = [
+    ["编码", "名称", "规格型号"],
+    ["01.01.001.00001", "贴片电阻", "10kΩ±1%/R0603(A)"],
+    ["30.01.001.00002", "贴片电阻", "10kΩ±1%/R0603(B)"],
+    ["01.01.001.00003", "贴片电阻", "10kΩ±1%/R0805(C)"],
+]
+
+
+def test_candidate_zone_renders_multi_candidates():
+    """多候选必须落到候选区（回归 StyleProxy 边框复制崩溃）。"""
+    rows = [["Name", "Designator", "Quantity", "Footprint"], ["10kΩ", "R1", "1", "R0603"]]
+    result = convert_excel({"bom_rows": rows, "material_rows": MULTI_MATERIAL, "sort_mode": "company"})
+    ws = load_workbook(io.BytesIO(result["data"])).active
+    assert ws["A5"].value == 2  # 主表每项一行（推荐编码）
+    zone = next(r for r in range(6, ws.max_row + 1) if str(ws.cell(r, 1).value or "").startswith("▼"))
+    codes = [ws.cell(r, 2).value for r in range(zone + 1, ws.max_row + 1)
+             if str(ws.cell(r, 1).value or "").endswith("-1")]
+    assert "01.01.001.00001" in codes or "30.01.001.00002" in codes
+    assert str(ws.cell(ws.max_row, 1).value).startswith("备注：")
+
+
+def test_suggestion_zone_lists_near_model_for_unmatched():
+    """未定码且型号近似时，备选型号进候选区，并在备注里提示。"""
+    rows = [["Name", "Designator", "Quantity", "Footprint"], ["XYZ-12345", "U9", "1", "SOT-23-6"]]
+    material = [["编码", "名称", "规格型号"], ["01.01.001.00010", "逻辑芯片", "XYZ-12346/SOT-23-6"]]
+    result = convert_excel({"bom_rows": rows, "material_rows": material, "sort_mode": "company"})
+    ws = load_workbook(io.BytesIO(result["data"])).active
+    zone = next(r for r in range(6, ws.max_row + 1) if str(ws.cell(r, 1).value or "").startswith("▼"))
+    labels = [str(ws.cell(r, 9).value or "") for r in range(zone + 1, ws.max_row + 1)]
+    assert any("备选·未定码" in text for text in labels)
+    assert "备选" in (ws["I5"].value or "")
