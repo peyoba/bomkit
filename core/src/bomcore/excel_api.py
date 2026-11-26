@@ -645,9 +645,12 @@ def convert_excel(args: dict) -> dict:
         raise ProfileError("INVALID_ROWS", "上一版 BOM 必须为行数组")
     if not isinstance(reference_rows, list):
         raise ProfileError("INVALID_ROWS", "物料参考表必须为行数组列表")
-    sort_mode = args.get("sort_mode", "legacy")
-    if sort_mode not in ("legacy", "company"):
-        raise ProfileError("INVALID_ROWS", "sort_mode 只能是 legacy 或 company")
+    sort_mode = args.get("sort_mode", "auto")
+    if sort_mode not in ("auto", "legacy", "company"):
+        raise ProfileError("INVALID_ROWS", "sort_mode 只能是 auto、legacy 或 company")
+    if sort_mode == "auto":
+        # 给了谱系输入就走公司规则 v2，否则保持旧工具行为（契约 v1.1 A.5）
+        sort_mode = "company" if (previous_rows is not None or reference_rows) else "legacy"
     for label, rows in [("上一版 BOM", previous_rows)] + [(f"参考表{i + 1}", r) for i, r in enumerate(reference_rows)]:
         if rows is not None and load_lineage(rows) is None:
             raise ProfileError(
@@ -661,7 +664,7 @@ def convert_excel(args: dict) -> dict:
     for key in ("pcba_name", "pcba_model"):
         if not meta.get(key) and inherit.get(key):
             meta = {**meta, key: inherit[key]}
-    company_v2 = sort_mode == "company" or previous_rows is not None or bool(reference_rows)
+    company_v2 = sort_mode == "company"
     if company_v2:
         workbook, count, quantity = _company_workbook_v2(
             analysis["items"], meta, args.get("material_rows") is not None)

@@ -200,3 +200,21 @@ def test_suggestion_zone_lists_near_model_for_unmatched():
     labels = [str(ws.cell(r, 9).value or "") for r in range(zone + 1, ws.max_row + 1)]
     assert any("备选·未定码" in text for text in labels)
     assert "备选" in (ws["I5"].value or "")
+
+
+def test_sort_mode_auto_is_accepted_and_resolves_by_lineage():
+    """网页固定传 sort_mode="auto"：无谱系→旧 12 列；有谱系→公司规则 13 列；显式 legacy 优先。"""
+    rows = [["Name", "Designator", "Quantity", "Footprint"], ["10kΩ", "R1", "1", "R0603"]]
+    material = [["编码", "名称", "规格型号"], ["01.01.001.01832", "贴片电阻", "10kΩ±1%/R0603(A)"]]
+    previous = [["物料编码", "规格型号（金蝶）", "位号", "封装"],
+                ["01.01.001.01832", "10kΩ±1%/R0603(A)", "R1", "R0603"]]
+    base = {"bom_rows": rows, "material_rows": material}
+    auto = load_workbook(io.BytesIO(convert_excel({**base, "sort_mode": "auto"})["data"])).active
+    assert auto.max_column == 12
+    with_previous = load_workbook(io.BytesIO(
+        convert_excel({**base, "sort_mode": "auto", "previous_rows": previous})["data"])).active
+    assert with_previous.max_column == 13
+    assert "上一版继承" in (with_previous["I5"].value or "")
+    explicit_legacy = load_workbook(io.BytesIO(
+        convert_excel({**base, "sort_mode": "legacy", "previous_rows": previous})["data"])).active
+    assert explicit_legacy.max_column == 12
